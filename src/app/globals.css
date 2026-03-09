@@ -3,25 +3,17 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --font-display: 'Cinzel Decorative', serif;
-    --font-title:   var(--font-cinzel), serif;
-    --font-body:    var(--font-rajdhani), sans-serif;
+  body {
+    font-weight: 500;  /* ← Rajdhani en 400 es muy fino, 500 lee mejor */
   }
 
-  * { box-sizing: border-box; }
-
-  /* Scrollbar */
   ::-webkit-scrollbar       { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: #060608; }
   ::-webkit-scrollbar-thumb { background: #7a0000; border-radius: 0; }
-
-  /* Selección */
-  ::selection { background: #7a0000; color: #d4c9b0; }
+  ::selection               { background: #7a0000; color: #f0e8d5; }
 }
 
 @layer components {
-  /* Grain overlay — aplicar a elementos que lo necesiten */
   .grain-overlay {
     position: relative;
   }
@@ -36,7 +28,6 @@
     z-index: 1;
   }
 
-  /* Clip diagonal — botones primarios */
   .clip-diagonal {
     clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
   }
@@ -44,7 +35,6 @@
     clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
   }
 
-  /* Sección con línea sangre a la izquierda */
   .section-label {
     @apply flex items-center gap-3 text-ash font-title text-xs tracking-widest uppercase;
   }
@@ -57,7 +47,6 @@
     flex-shrink: 0;
   }
 
-  /* Botón primario */
   .btn-primary {
     @apply w-full py-3 bg-blood border border-crimson text-bone font-title text-xs tracking-widest uppercase cursor-pointer transition-all duration-200 clip-diagonal;
   }
@@ -66,12 +55,20 @@
     box-shadow: 0 0 20px rgba(192, 57, 43, 0.4);
   }
 
-  /* Input oscuro */
   .input-dark {
     @apply bg-iron border border-ghost text-bone font-body text-base outline-none transition-colors duration-200;
   }
   .input-dark:focus {
     @apply border-crimson;
     box-shadow: 0 0 8px rgba(192, 57, 43, 0.2);
+  }
+
+  /* Texto secundario más legible */
+  .text-label {
+    @apply text-ash text-xs tracking-widest uppercase font-title;
+  }
+
+  .text-meta {
+    @apply text-ghost text-xs tracking-wide;
   }
 }

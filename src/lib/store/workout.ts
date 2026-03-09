@@ -30,6 +30,7 @@ interface WorkoutStore {
   toggleSetComplete: (exerciseIdx: number, setIdx: number) => void
   addSet: (exerciseIdx: number) => void
   resetSession: () => void
+  removeSet: (exerciseIdx: number) => void
 
   // Computed
   getTotalSets: () => number
@@ -93,6 +94,14 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
         i === exerciseIdx ? { ...ex, sets: [...ex.sets, emptySet()] } : ex
       ),
     })),
+
+  removeSet: (exerciseIdx: number) =>
+  set(state => ({
+    activeExercises: state.activeExercises.map((ex, i) => {
+      if (i !== exerciseIdx || ex.sets.length <= 1) return ex
+      return { ...ex, sets: ex.sets.slice(0, -1) }
+    }),
+  })),
 
   resetSession: () =>
     set({ sessionId: null, sessionName: '', activeExercises: [], currentExerciseIdx: 0, startedAt: null }),

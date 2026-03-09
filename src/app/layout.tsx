@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
-import { Cinzel, Rajdhani } from 'next/font/google'
 import './globals.css'
+import { Cinzel, Rajdhani } from 'next/font/google'
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={`${cinzel.variable} ${rajdhani.variable}`}>
-      <body className="bg-void text-bone font-body antialiased">
+      <body className="bg-black text-white min-h-screen">
         {children}
       </body>
     </html>
