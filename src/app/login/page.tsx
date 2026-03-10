@@ -5,108 +5,101 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
-  const supabase = createClient()
-  const router = useRouter()
-
-  const [mode, setMode] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [username, setUsername] = useState('')
+  const [isRegister, setIsRegister] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
+  const router = useRouter()
+  const supabase = createClient()
 
   const handleSubmit = async () => {
-    setError(null)
-    setMessage(null)
     setLoading(true)
+    setError(null)
 
-    try {
-      if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-        router.push('/dashboard')
-        router.refresh()
-      } else {
-        if (!username.trim()) throw new Error('El username es requerido')
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { username, display_name: username } },
-        })
-        if (error) throw error
-        setMessage('Revisá tu email para confirmar la cuenta.')
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error inesperado')
-    } finally {
-      setLoading(false)
-    }
+    const { error } = isRegister
+      ? await supabase.auth.signUp({ email, password })
+      : await supabase.auth.signInWithPassword({ email, password })
+
+    if (error) { setError(error.message); setLoading(false); return }
+    router.push('/dashboard')
+    router.refresh()
+  }
+
+  const handleGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+    if (error) setError(error.message)
   }
 
   return (
-    <div className="min-h-screen bg-void flex items-center justify-center relative overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-          backgroundSize: '200px 200px',
-        }}
-      />
-      <div className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse 600px 400px at 50% 50%, rgba(122,0,0,0.08) 0%, transparent 70%)' }}
-      />
+    <div className="min-h-screen flex items-center justify-center bg-void px-4">
+      <div className="w-full max-w-sm">
 
-      <div className="w-full max-w-sm px-6 relative z-10">
-        <div className="text-center mb-10">
-          <svg viewBox="0 0 56 56" className="w-14 h-14 mx-auto mb-4">
-            <polygon points="28,3 34,18 50,18 38,29 43,45 28,35 13,45 18,29 6,18 22,18"
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-10">
+          <svg viewBox="0 0 42 42" className="w-14 h-14 mb-4">
+            <polygon points="21,2 26,14 39,14 29,22 33,35 21,27 9,35 13,22 3,14 16,14"
               fill="none" stroke="#7a0000" strokeWidth="1.5"/>
-            <polygon points="28,10 32,20 43,20 35,27 38,38 28,32 18,38 21,27 13,20 24,20"
-              fill="#7a0000" opacity="0.25"/>
-            <circle cx="28" cy="28" r="4" fill="#c0392b"/>
+            <circle cx="21" cy="21" r="3" fill="#c0392b"/>
           </svg>
           <p className="font-title text-blood text-xs tracking-[0.4em] uppercase mb-1">Iron Berserk</p>
-          <h1 className="font-title text-2xl font-bold text-bone tracking-wide">Forge Your Will</h1>
+          <h1 className="font-title text-2xl font-bold text-bone tracking-wide">
+            {isRegister ? 'Forge Your' : 'Enter the'} <span className="text-crimson">
+              {isRegister ? 'Legend' : 'Void'}
+            </span>
+          </h1>
         </div>
 
-        <div className="flex mb-6 border border-ghost/30">
-          {(['login', 'register'] as const).map(m => (
-            <button key={m} onClick={() => { setMode(m); setError(null); setMessage(null) }}
-              className="flex-1 py-2.5 font-title text-xs tracking-widest uppercase transition-all duration-200"
-              style={{
-                background: mode === m ? '#7a0000' : 'transparent',
-                color: mode === m ? '#d4c9b0' : '#4a4455',
-              }}>
-              {m === 'login' ? 'Enter' : 'Join'}
-            </button>
-          ))}
+        {/* Google OAuth */}
+        <button onClick={handleGoogle}
+          className="w-full py-3 mb-4 font-title text-xs tracking-widest uppercase flex items-center justify-center gap-3 transition-all duration-150"
+          style={{ background: '#1a181e', border: '1px solid #4a4455', color: '#b0a8bc' }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = '#c0392b'; e.currentTarget.style.color = '#f0e8d5' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = '#4a4455'; e.currentTarget.style.color = '#b0a8bc' }}>
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Continue with Google
+        </button>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-1 h-px" style={{ background: '#1a181e' }} />
+          <span className="font-title text-[10px] tracking-widest text-ghost uppercase">or</span>
+          <div className="flex-1 h-px" style={{ background: '#1a181e' }} />
         </div>
 
+        {/* Email/password */}
         <div className="flex flex-col gap-3">
-          {mode === 'register' && (
-            <input className="input-dark w-full px-4 py-3 text-sm tracking-wide"
-              placeholder="Username" value={username}
-              onChange={e => setUsername(e.target.value)} />
-          )}
-          <input className="input-dark w-full px-4 py-3 text-sm tracking-wide"
-            placeholder="Email" type="email" value={email}
-            onChange={e => setEmail(e.target.value)} />
-          <input className="input-dark w-full px-4 py-3 text-sm tracking-wide"
-            placeholder="Password" type="password" value={password}
-            onChange={e => setPassword(e.target.value)}
+          <input className="input-dark w-full px-4 py-3 text-sm"
+            type="email" placeholder="Email"
+            value={email} onChange={e => setEmail(e.target.value)} />
+          <input className="input-dark w-full px-4 py-3 text-sm"
+            type="password" placeholder="Password"
+            value={password} onChange={e => setPassword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSubmit()} />
         </div>
 
         {error && (
-          <p className="mt-4 text-ember text-xs tracking-wide border border-blood/50 bg-rust/30 px-4 py-2">{error}</p>
-        )}
-        {message && (
-          <p className="mt-4 text-gold text-xs tracking-wide border border-gold/30 bg-iron/50 px-4 py-2">{message}</p>
+          <p className="text-ember text-xs border border-blood/50 bg-rust/30 px-4 py-2 mt-3">{error}</p>
         )}
 
-        <button className="btn-primary mt-5" onClick={handleSubmit}
+        <button className="btn-primary w-full mt-4" onClick={handleSubmit}
           disabled={loading} style={{ opacity: loading ? 0.6 : 1 }}>
-          {loading ? 'Loading...' : mode === 'login' ? 'Enter the Abyss' : 'Forge Your Mark'}
+          {loading ? '...' : isRegister ? 'Create Account' : 'Sign In'}
+        </button>
+
+        <button onClick={() => setIsRegister(v => !v)}
+          className="w-full mt-3 font-title text-xs tracking-widest uppercase text-ghost hover:text-ash transition-colors py-2">
+          {isRegister ? 'Already have an account? Sign In' : 'New warrior? Create Account'}
         </button>
       </div>
     </div>
