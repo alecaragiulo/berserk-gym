@@ -71,4 +71,12 @@
   .text-meta {
     @apply text-ghost text-xs tracking-wide;
   }
+
+  @layer utilities {
+    /* Padding bottom para el bottom nav en mobile */
+    .mobile-safe {
+      padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+    }
+  }
+
 }

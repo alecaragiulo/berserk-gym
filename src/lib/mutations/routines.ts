@@ -77,3 +77,37 @@ export async function subscribeToRoutine(userId: string, routineId: number): Pro
       .eq('routine_id', routineId)
     return !error
   }
+
+  export async function updateRoutine(
+    routineId: number,
+    input: CreateRoutineInput
+  ): Promise<boolean> {
+    const supabase = createClient()
+  
+    const { error: routineError } = await (supabase as any)
+      .from('routines')
+      .update({
+        name: input.name,
+        description: input.description || null,
+        days_per_week: input.days_per_week,
+        is_public: input.is_public,
+        tags: input.tags,
+      })
+      .eq('id', routineId)
+  
+    if (routineError) return false
+  
+    // Borramos los ejercicios anteriores y los reinsertamos
+    await (supabase as any)
+      .from('routine_exercises')
+      .delete()
+      .eq('routine_id', routineId)
+  
+    if (input.exercises.length > 0) {
+      await (supabase as any)
+        .from('routine_exercises')
+        .insert(input.exercises.map(ex => ({ ...ex, routine_id: routineId })))
+    }
+  
+    return true
+  }

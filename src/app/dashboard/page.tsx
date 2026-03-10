@@ -15,7 +15,7 @@ export default async function DashboardPage() {
   ])
 
   return (
-    <div className="p-10">
+    <div className="p-4 md:p-10 pb-24 md:pb-10">
       <header className="mb-8 border-b border-ghost/30 pb-6 relative">
         <div
           className="absolute bottom-0 left-0 right-0 h-px"
@@ -30,8 +30,8 @@ export default async function DashboardPage() {
       </header>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-0.5 mb-8">
-        {[
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-0.5 mb-8">
+      {[
           { label: 'Sessions',  value: stats?.totalSessions ?? 0,                             sub: 'Total battles' },
           { label: 'Volume',    value: `${((stats?.monthVolumeKg ?? 0) / 1000).toFixed(1)}T`, sub: 'Kg this month' },
           { label: 'Streak',    value: stats?.streak ?? 0,                                    sub: 'Days unbroken' },

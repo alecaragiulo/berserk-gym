@@ -1,7 +1,8 @@
 {
+  "/login/page": "app/login/page.js",
   "/workout/page": "app/workout/page.js",
   "/routines/page": "app/routines/page.js",
+  "/routines/edit/[id]/page": "app/routines/edit/[id]/page.js",
   "/progress/page": "app/progress/page.js",
-  "/routines/create/page": "app/routines/create/page.js",
   "/dashboard/page": "app/dashboard/page.js"
 }

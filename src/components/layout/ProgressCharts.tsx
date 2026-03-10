@@ -92,8 +92,7 @@ export default function ProgressCharts({ sessions }: Props) {
                 const duration = s.finished_at
                   ? Math.round((new Date(s.finished_at).getTime() - new Date(s.started_at).getTime()) / 60000)
                   : 0
-                const exerciseNames = [...new Set(s.workout_sets.map(ws => ws.exercises?.name).filter(Boolean))]
-
+                  const exerciseNames = Array.from(new Set(s.workout_sets.map(ws => ws.exercises?.name).filter(Boolean)))
                 return (
                   <div
                     key={s.id}
