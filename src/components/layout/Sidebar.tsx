@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation'
 
 const NAV_ITEMS = [
   { href: '/dashboard', icon: '⊞', label: 'Dashboard' },
-  { href: '/workout',   icon: '⚔', label: 'Workout'   },
   { href: '/routines',  icon: '◈', label: 'Routines'  },
   { href: '/progress',  icon: '▲', label: 'Progress'  },
 ]

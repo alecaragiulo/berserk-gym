@@ -18,18 +18,23 @@ export default async function WorkoutPage({ searchParams }: Props) {
   const routineId = searchParams.routineId ? parseInt(searchParams.routineId) : null
   const day = searchParams.day ? parseInt(searchParams.day) : null
 
+  // Sin rutina no hay workout
+  if (!routineId || !day) redirect('/routines')
+
   const [profile, exercises, myRoutines] = await Promise.all([
     getProfile(user.id),
     getExercises(),
-    routineId ? getMyRoutinesWithExercises() : Promise.resolve([]),
+    getMyRoutinesWithExercises(),
   ])
 
   const routine = myRoutines.find(r => r.id === routineId) ?? null
-  const routineExercisesForDay = routine && day
-    ? routine.routine_exercises
-        .filter(re => re.day_number === day)
-        .sort((a, b) => a.position - b.position)
-    : []
+
+  // Si la rutina no existe o no le pertenece, redirigir
+  if (!routine) redirect('/routines')
+
+  const routineExercisesForDay = routine.routine_exercises
+    .filter(re => re.day_number === day)
+    .sort((a, b) => a.position - b.position)
 
   const exerciseIds = routineExercisesForDay.map(re => re.exercise_id)
   const lastSets = await getLastSetsForExercises(user.id, exerciseIds)
@@ -42,7 +47,7 @@ export default async function WorkoutPage({ searchParams }: Props) {
           exercises={exercises}
           userId={user.id}
           routineId={routineId}
-          routineName={routine?.name ?? null}
+          routineName={routine.name}
           routineDay={day}
           preloadedExercises={routineExercisesForDay}
           lastSets={lastSets}
