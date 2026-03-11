@@ -24,6 +24,7 @@ export default function RoutinesFeed({ publicRoutines, myRoutines, subscribedRou
   const [filter, setFilter] = useState<string>('all')
   const [expandedRoutine, setExpandedRoutine] = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [localSubscribedRoutines, setLocalSubscribedRoutines] = useState<RoutineWithAuthor[]>(subscribedRoutines)
 
   const allTags = ['all', ...Array.from(new Set(publicRoutines.flatMap(r => r.tags ?? [])))]
   const filtered = filter === 'all' ? publicRoutines : publicRoutines.filter(r => r.tags?.includes(filter))
@@ -31,13 +32,19 @@ export default function RoutinesFeed({ publicRoutines, myRoutines, subscribedRou
   const toggleSubscription = async (routineId: number) => {
     setLoading(routineId)
     const isSubbed = subs.has(routineId)
+  
     if (isSubbed) {
       await unsubscribeFromRoutine(userId, routineId)
       setSubs(prev => { const n = new Set(prev); n.delete(routineId); return n })
+      setLocalSubscribedRoutines(prev => prev.filter(r => r.id !== routineId))
     } else {
       await subscribeToRoutine(userId, routineId)
       setSubs(prev => new Set(prev).add(routineId))
+      // Agregar la rutina a la lista local
+      const routine = publicRoutines.find(r => r.id === routineId)
+      if (routine) setLocalSubscribedRoutines(prev => [...prev, routine])
     }
+  
     setLoading(null)
   }
 
@@ -333,7 +340,7 @@ export default function RoutinesFeed({ publicRoutines, myRoutines, subscribedRou
           </div>
 
           {/* ── Rutinas seguidas ── */}
-          {subscribedRoutines.length > 0 && (
+          {localSubscribedRoutines.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <p className="font-title text-[10px] tracking-widest uppercase text-ghost">Following</p>
@@ -344,7 +351,7 @@ export default function RoutinesFeed({ publicRoutines, myRoutines, subscribedRou
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {subscribedRoutines.map(routine => (
+                {localSubscribedRoutines.map(routine => (
                   <div key={routine.id}
                     className="flex flex-col transition-all duration-200"
                     style={{ background: '#0e0d10', border: '1px solid #1a181e' }}>

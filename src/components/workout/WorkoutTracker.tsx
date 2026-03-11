@@ -439,37 +439,87 @@ export default function WorkoutTracker({
         </div>
       </div>
 
-      {/* ── Mobile: tabs ── */}
-      <div className="md:hidden">
-        <div className="flex mb-4" style={{ borderBottom: '1px solid #1a181e' }}>
-          {([['exercises', 'Exercises'], ['logger', 'Logger']] as [MobileTab, string][]).map(([t, label]) => (
-            <button key={t} onClick={() => setMobileTab(t)}
-              className="flex-1 py-2.5 font-title text-xs tracking-widest uppercase transition-all duration-150"
-              style={{
-                color: mobileTab === t ? '#f0e8d5' : '#6e6880',
-                borderBottom: mobileTab === t ? '2px solid #c0392b' : '2px solid transparent',
-                marginBottom: '-1px',
-              }}>
-              {label}
-              {t === 'exercises' && store.activeExercises.length > 0 && (
-                <span className="ml-2 text-[10px] px-1.5 py-0.5 font-title"
-                  style={{ background: '#2e1a1a', border: '1px solid #7a0000', color: '#e74c3c' }}>
-                  {store.activeExercises.length}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+      {/* ── Mobile ── */}
+<div className="md:hidden">
 
-        {mobileTab === 'exercises' && (
-          <div>
-            <div className="section-label mb-4">Exercises</div>
-            {exerciseListJSX}
+{/* Scroll horizontal de ejercicios */}
+<div className="mb-4 -mx-4 px-4">
+  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none"
+    style={{ scrollSnapType: 'x mandatory' }}>
+
+    {store.activeExercises.map((ex, i) => {
+      const active = i === store.currentExerciseIdx
+      const done = ex.sets.every(s => s.completed)
+      const doneSets = ex.sets.filter(s => s.completed).length
+
+      return (
+        <button key={ex.exercise.id}
+          onClick={() => store.setCurrentExercise(i)}
+          className="flex-shrink-0 text-left transition-all duration-150 px-3 py-2.5"
+          style={{
+            scrollSnapAlign: 'start',
+            background: active ? '#1a181e' : '#0e0d10',
+            border: `1px solid ${active ? '#c0392b' : done ? '#4a4455' : '#1a181e'}`,
+            minWidth: '120px',
+            maxWidth: '140px',
+            opacity: done && !active ? 0.6 : 1,
+          }}>
+          <p className="font-title text-[10px] tracking-widest uppercase mb-1 truncate"
+            style={{ color: active ? '#c0392b' : '#6e6880' }}>
+            {ex.exercise.muscle_group}
+          </p>
+          <p className="font-title text-xs font-bold text-bone leading-snug truncate mb-1.5">
+            {ex.exercise.name}
+          </p>
+          {/* Dots de sets */}
+          <div className="flex gap-1 flex-wrap">
+            {ex.sets.map((s, j) => (
+              <div key={j} className="w-1.5 h-1.5 rounded-full"
+                style={{
+                  background: s.completed ? '#c0392b' : active ? '#4a4455' : '#2e2e3a',
+                  boxShadow: s.completed ? '0 0 4px rgba(192,57,43,0.5)' : 'none',
+                }} />
+            ))}
           </div>
-        )}
+          <p className="font-title text-[9px] tracking-widest text-ghost mt-1">
+            {doneSets}/{ex.sets.length}
+          </p>
+        </button>
+      )
+    })}
 
-        {mobileTab === 'logger' && setLoggerJSX}
-      </div>
+    {/* Botón agregar ejercicio inline */}
+    <button
+      onClick={() => setShowExercisePicker(v => !v)}
+      className="flex-shrink-0 flex items-center justify-center transition-all duration-150"
+      style={{
+        minWidth: '48px',
+        background: showExercisePicker ? '#2e1a1a' : '#0e0d10',
+        border: `1px solid ${showExercisePicker ? '#c0392b' : '#1a181e'}`,
+        color: showExercisePicker ? '#e74c3c' : '#4a4455',
+        fontSize: '20px',
+      }}>
+      {showExercisePicker ? '✕' : '+'}
+    </button>
+  </div>
+
+  {/* Exercise picker */}
+  {showExercisePicker && exercisePickerJSX}
+</div>
+
+{/* Progress bar */}
+<div className="h-0.5 bg-iron mb-3 overflow-hidden -mx-4">
+  <div className="h-full transition-all duration-500"
+    style={{
+      width: `${progress}%`,
+      background: 'linear-gradient(90deg, #7a0000, #e74c3c)',
+      boxShadow: '0 0 8px #c0392b',
+    }} />
+</div>
+
+{/* Set logger — siempre visible */}
+{setLoggerJSX}
+</div>
     </div>
   )
 }
