@@ -137,3 +137,92 @@ export async function getLastSetsForExercises(
 
   return result
 }
+
+export interface SetDetail {
+  set_number: number
+  weight_kg: number | null
+  reps: number | null
+  completed: boolean
+}
+
+export interface ExerciseWithSets {
+  exercise_id: number
+  exercise_name: string
+  muscle_group: string
+  sets: SetDetail[]
+}
+
+export interface SessionDetail {
+  id: number
+  started_at: string
+  finished_at: string | null
+  total_volume: number
+  routine_name: string | null
+  exercises: ExerciseWithSets[]
+}
+
+export async function getSessionsByMonth(userId: string, year: number, month: number): Promise<SessionDetail[]> {
+  const supabase = await createClient()
+
+  const from = new Date(year, month - 1, 1).toISOString()
+  const to = new Date(year, month, 1).toISOString()
+
+  const { data } = await (supabase as any)
+    .from('workout_sessions')
+    .select(`
+      id,
+      started_at,
+      finished_at,
+      total_volume,
+      routines ( name ),
+      workout_sets (
+        set_number,
+        weight_kg,
+        reps,
+        completed,
+        exercises ( id, name, muscle_group )
+      )
+    `)
+    .eq('user_id', userId)
+    .gte('started_at', from)
+    .lt('started_at', to)
+    .not('finished_at', 'is', null)
+    .order('started_at', { ascending: false })
+
+  if (!data) return []
+
+  return (data as any[]).map(session => {
+    // Agrupar sets por ejercicio
+    const exerciseMap: Record<number, ExerciseWithSets> = {}
+    for (const set of session.workout_sets ?? []) {
+      const ex = set.exercises
+      if (!ex) continue
+      if (!exerciseMap[ex.id]) {
+        exerciseMap[ex.id] = {
+          exercise_id: ex.id,
+          exercise_name: ex.name,
+          muscle_group: ex.muscle_group,
+          sets: [],
+        }
+      }
+      exerciseMap[ex.id].sets.push({
+        set_number: set.set_number,
+        weight_kg: set.weight_kg,
+        reps: set.reps,
+        completed: set.completed,
+      })
+    }
+
+    return {
+      id: session.id,
+      started_at: session.started_at,
+      finished_at: session.finished_at,
+      total_volume: session.total_volume ?? 0,
+      routine_name: session.routines?.name ?? null,
+      exercises: Object.values(exerciseMap).map(ex => ({
+        ...ex,
+        sets: ex.sets.sort((a, b) => a.set_number - b.set_number),
+      })),
+    }
+  })
+}

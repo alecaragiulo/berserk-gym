@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: '/dashboard', icon: '⊞', label: 'Dashboard' },
   { href: '/routines',  icon: '◈', label: 'Routines'  },
   { href: '/progress',  icon: '▲', label: 'Progress'  },
+  { href: '/history',   icon: '◷', label: 'History'   },
 ]
 
 interface Props {
