@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createRoutine } from '@/lib/mutations/routines'
+import { createCustomExercise } from '@/lib/mutations/sessions'
 import type { Exercise } from '@/types/database'
 
 interface Props {
@@ -18,42 +19,31 @@ interface DayExercise {
 }
 
 const MUSCLE_GROUPS = ['all', 'chest', 'back', 'shoulders', 'legs', 'biceps', 'triceps']
-const SUGGESTED_TAGS = ['PUSH', 'PULL', 'LEGS', 'STRENGTH', 'HYPERTROPHY', 'ENDURANCE', 'FULL BODY', 'BULK', 'CARDIO']
+type PickerTab = 'browse' | 'create'
 
 export default function CreateRoutineForm({ exercises, userId }: Props) {
   const router = useRouter()
 
-  // Info básica
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [daysPerWeek, setDaysPerWeek] = useState(3)
   const [isPublic, setIsPublic] = useState(false)
-  const [tags, setTags] = useState<string[]>([])
-  const [customTag, setCustomTag] = useState('')
 
-  // Ejercicios por día
   const [dayExercises, setDayExercises] = useState<Record<number, DayExercise[]>>({})
-
-  // Picker
   const [activeDayPicker, setActiveDayPicker] = useState<number | null>(null)
+  const [pickerTab, setPickerTab] = useState<PickerTab>('browse')
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
 
-  // Submit
+  const [newName, setNewName] = useState('')
+  const [newMuscle, setNewMuscle] = useState('chest')
+  const [newEquipment, setNewEquipment] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [localExercises, setLocalExercises] = useState<Exercise[]>(exercises)
+
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const toggleTag = (tag: string) => {
-    setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
-  }
-
-  const addCustomTag = () => {
-    const t = customTag.trim().toUpperCase()
-    if (t && !tags.includes(t)) {
-      setTags(prev => [...prev, t])
-      setCustomTag('')
-    }
-  }
 
   const addExerciseToDay = (day: number, ex: Exercise) => {
     setDayExercises(prev => ({
@@ -62,6 +52,7 @@ export default function CreateRoutineForm({ exercises, userId }: Props) {
     }))
     setActiveDayPicker(null)
     setSearch('')
+    setPickerTab('browse')
   }
 
   const removeExerciseFromDay = (day: number, idx: number) => {
@@ -83,12 +74,37 @@ export default function CreateRoutineForm({ exercises, userId }: Props) {
     }))
   }
 
-  const filteredExercises = (day: number) => exercises.filter(ex => {
+  const filteredExercises = (day: number) => localExercises.filter(ex => {
     const matchMuscle = filter === 'all' || ex.muscle_group === filter
     const matchSearch = ex.name.toLowerCase().includes(search.toLowerCase())
     const notAdded = !(dayExercises[day] ?? []).some(d => d.exercise.id === ex.id)
     return matchMuscle && matchSearch && notAdded
   })
+
+  const handleCreateExercise = async (day: number) => {
+    if (!newName.trim()) { setCreateError('Name is required'); return }
+    setCreating(true)
+    setCreateError(null)
+
+    const id = await createCustomExercise(userId, newName.trim(), newMuscle, newEquipment.trim() || null)
+    if (!id) { setCreateError('Failed to create exercise'); setCreating(false); return }
+
+    const newExercise: Exercise = {
+      id,
+      name: newName.trim(),
+      muscle_group: newMuscle,
+      secondary_muscles: null,
+      equipment: newEquipment.trim() || null,
+      is_custom: true,
+      created_by: userId,
+      created_at: new Date().toISOString(),
+    }
+
+    setLocalExercises(prev => [...prev, newExercise])
+    addExerciseToDay(day, newExercise)
+    setNewName(''); setNewEquipment(''); setNewMuscle('chest')
+    setCreating(false)
+  }
 
   const handleSubmit = async () => {
     if (!name.trim()) { setError('Routine name is required'); return }
@@ -114,7 +130,7 @@ export default function CreateRoutineForm({ exercises, userId }: Props) {
       description: description.trim(),
       days_per_week: daysPerWeek,
       is_public: isPublic,
-      tags,
+      tags: [],
       exercises: exercisesFlat,
     })
 
@@ -124,9 +140,8 @@ export default function CreateRoutineForm({ exercises, userId }: Props) {
   }
 
   return (
-    <div className="p-10 min-h-screen">
+    <div className="p-4 md:p-10 min-h-screen pb-24 md:pb-10">
 
-      {/* Header */}
       <header className="mb-8 pb-6 border-b border-ghost/30 relative">
         <div className="absolute bottom-0 left-0 right-0 h-px"
           style={{ background: 'linear-gradient(90deg, #7a0000, transparent 60%)' }} />
@@ -136,41 +151,29 @@ export default function CreateRoutineForm({ exercises, userId }: Props) {
         </h1>
       </header>
 
-      <div className="grid grid-cols-5 gap-8 max-w-6xl">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl">
 
-        {/* ── Info básica — 2 cols ── */}
-        <div className="col-span-2 flex flex-col gap-5">
+        {/* ── Info básica ── */}
+        <div className="col-span-1 flex flex-col gap-5">
           <div className="section-label">Basic Info</div>
 
-          {/* Nombre */}
           <div>
-            <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">
-              Routine Name *
-            </label>
+            <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">Routine Name *</label>
             <input className="input-dark w-full px-4 py-2.5 text-sm"
               placeholder="e.g. Black Swordsman Split"
               value={name} onChange={e => setName(e.target.value)} />
           </div>
 
-          {/* Descripción */}
           <div>
-            <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">
-              Description
-            </label>
-            <textarea
-              className="input-dark w-full px-4 py-2.5 text-sm resize-none"
+            <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">Description</label>
+            <textarea className="input-dark w-full px-4 py-2.5 text-sm resize-none"
               placeholder="What's this routine about?"
-              rows={3}
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-            />
+              rows={3} value={description}
+              onChange={e => setDescription(e.target.value)} />
           </div>
 
-          {/* Días por semana */}
           <div>
-            <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">
-              Days per week
-            </label>
+            <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">Days per week</label>
             <div className="flex gap-1">
               {[2, 3, 4, 5, 6].map(d => (
                 <button key={d} onClick={() => setDaysPerWeek(d)}
@@ -186,62 +189,10 @@ export default function CreateRoutineForm({ exercises, userId }: Props) {
             </div>
           </div>
 
-          {/* Tags */}
           <div>
-            <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">
-              Tags
-            </label>
-            <div className="flex flex-wrap gap-1 mb-2">
-              {SUGGESTED_TAGS.map(tag => (
-                <button key={tag} onClick={() => toggleTag(tag)}
-                  className="font-title text-[10px] tracking-widest uppercase px-2.5 py-1 transition-all duration-150"
-                  style={{
-                    background: tags.includes(tag) ? '#7a0000' : '#1a181e',
-                    border: `1px solid ${tags.includes(tag) ? '#c0392b' : '#4a4455'}`,
-                    color: tags.includes(tag) ? '#f0e8d5' : '#6e6880',
-                  }}>
-                  {tag}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-1">
-              <input className="input-dark flex-1 px-3 py-1.5 text-xs"
-                placeholder="Custom tag..."
-                value={customTag}
-                onChange={e => setCustomTag(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addCustomTag()} />
-              <button onClick={addCustomTag}
-                className="font-title text-xs tracking-widest uppercase px-3 py-1.5 transition-all duration-150"
-                style={{ background: '#1a181e', border: '1px solid #4a4455', color: '#6e6880' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#c0392b'; e.currentTarget.style.color = '#f0e8d5' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#4a4455'; e.currentTarget.style.color = '#6e6880' }}>
-                + Add
-              </button>
-            </div>
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {tags.map((tag: string) => (
-                  <span key={tag}
-                    className="font-title text-[10px] tracking-widest uppercase px-2 py-0.5 flex items-center gap-1"
-                    style={{ background: '#2e1a1a', border: '1px solid #7a0000', color: '#e74c3c' }}>
-                    {tag}
-                    <button onClick={() => toggleTag(tag)} className="hover:text-bone">✕</button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Visibilidad */}
-          <div>
-            <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">
-              Visibility
-            </label>
+            <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">Visibility</label>
             <div className="flex">
-              {[
-                { value: false, label: 'Private' },
-                { value: true, label: 'Public' },
-              ].map(opt => (
+              {[{ value: false, label: 'Private' }, { value: true, label: 'Public' }].map(opt => (
                 <button key={String(opt.value)} onClick={() => setIsPublic(opt.value)}
                   className="flex-1 py-2 font-title text-xs tracking-widest uppercase transition-all duration-150"
                   style={{
@@ -261,7 +212,7 @@ export default function CreateRoutineForm({ exercises, userId }: Props) {
           </div>
 
           {error && (
-            <p className="text-ember text-xs tracking-wide border border-blood/50 bg-rust/30 px-4 py-2">{error}</p>
+            <p className="text-ember text-xs border border-blood/50 bg-rust/30 px-4 py-2">{error}</p>
           )}
 
           <button className="btn-primary" onClick={handleSubmit}
@@ -275,12 +226,9 @@ export default function CreateRoutineForm({ exercises, userId }: Props) {
           </button>
         </div>
 
-        {/* ── Días — 3 cols ── */}
-        <div className="col-span-3">
-          <div className="section-label mb-4">
-            Program Structure — {daysPerWeek} days
-          </div>
-
+        {/* ── Días ── */}
+        <div className="col-span-2">
+          <div className="section-label mb-4">Program Structure — {daysPerWeek} days</div>
           <div className="flex flex-col gap-3">
             {Array.from({ length: daysPerWeek }, (_, i) => i + 1).map(day => (
               <div key={day} style={{ background: '#0e0d10', border: '1px solid #1a181e' }}>
@@ -295,7 +243,10 @@ export default function CreateRoutineForm({ exercises, userId }: Props) {
                     </span>
                   </div>
                   <button
-                    onClick={() => setActiveDayPicker(activeDayPicker === day ? null : day)}
+                    onClick={() => {
+                      setActiveDayPicker(activeDayPicker === day ? null : day)
+                      setPickerTab('browse')
+                    }}
                     className="font-title text-[10px] tracking-widest uppercase px-3 py-1.5 transition-all duration-150"
                     style={{
                       background: activeDayPicker === day ? '#2e1a1a' : 'transparent',
@@ -310,37 +261,37 @@ export default function CreateRoutineForm({ exercises, userId }: Props) {
                 {(dayExercises[day] ?? []).length > 0 && (
                   <div className="flex flex-col">
                     {(dayExercises[day] ?? []).map((ex, idx) => (
-                      <div key={idx}
-                        className="flex items-center gap-3 px-4 py-2.5 group"
+                      <div key={idx} className="flex items-center gap-3 px-4 py-2.5 group"
                         style={{ borderBottom: '1px solid #1a181e' }}>
                         <div className="flex-1 min-w-0">
-                          <p className="font-title text-sm text-bone font-semibold truncate">{ex.exercise.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-title text-sm text-bone font-semibold truncate">{ex.exercise.name}</p>
+                            {ex.exercise.is_custom && (
+                              <span className="text-[9px] font-title tracking-widest uppercase px-1.5 py-0.5 flex-shrink-0"
+                                style={{ background: '#2e1a1a', border: '1px solid #7a0000', color: '#e74c3c' }}>
+                                custom
+                              </span>
+                            )}
+                          </div>
                           <p className="text-ghost text-[10px] tracking-wide uppercase">{ex.exercise.muscle_group}</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1">
-                            <input
-                              className="input-dark w-10 px-1.5 py-1 text-center text-xs"
-                              type="number" min="1" max="10"
-                              value={ex.target_sets}
-                              onChange={e => updateDayExercise(day, idx, 'target_sets', parseInt(e.target.value) || 3)}
-                            />
+                            <input className="input-dark w-10 px-1.5 py-1 text-center text-xs"
+                              type="number" min="1" max="10" value={ex.target_sets}
+                              onChange={e => updateDayExercise(day, idx, 'target_sets', parseInt(e.target.value) || 3)} />
                             <span className="text-ghost text-[10px] font-title">sets</span>
                           </div>
                           <span className="text-ghost text-[10px]">×</span>
                           <div className="flex items-center gap-1">
-                            <input
-                              className="input-dark w-10 px-1.5 py-1 text-center text-xs"
-                              type="number" min="1" max="100"
-                              placeholder="—"
+                            <input className="input-dark w-10 px-1.5 py-1 text-center text-xs"
+                              type="number" min="1" max="100" placeholder="—"
                               value={ex.target_reps ?? ''}
-                              onChange={e => updateDayExercise(day, idx, 'target_reps', parseInt(e.target.value) || null)}
-                            />
+                              onChange={e => updateDayExercise(day, idx, 'target_reps', parseInt(e.target.value) || null)} />
                             <span className="text-ghost text-[10px] font-title">reps</span>
                           </div>
                         </div>
-                        <button
-                          onClick={() => removeExerciseFromDay(day, idx)}
+                        <button onClick={() => removeExerciseFromDay(day, idx)}
                           className="opacity-0 group-hover:opacity-100 transition-opacity text-ghost hover:text-ember text-xs w-5 h-5 flex items-center justify-center">
                           ✕
                         </button>
@@ -349,49 +300,102 @@ export default function CreateRoutineForm({ exercises, userId }: Props) {
                   </div>
                 )}
 
-                {/* Picker inline */}
+                {/* Picker con tabs */}
                 {activeDayPicker === day && (
                   <div style={{ borderTop: (dayExercises[day] ?? []).length > 0 ? '1px solid #1a181e' : 'none' }}>
-                    <div className="flex flex-wrap gap-0.5 p-2 border-b border-iron">
-                      {MUSCLE_GROUPS.map(mg => (
-                        <button key={mg} onClick={() => setFilter(mg)}
-                          className="font-title text-[9px] tracking-widest uppercase px-2 py-1 transition-all duration-150"
+                    <div className="flex border-b border-iron">
+                      {(['browse', 'create'] as PickerTab[]).map(tab => (
+                        <button key={tab} onClick={() => setPickerTab(tab)}
+                          className="flex-1 py-2 font-title text-[10px] tracking-widest uppercase transition-all duration-150"
                           style={{
-                            background: filter === mg ? '#7a0000' : 'transparent',
-                            color: filter === mg ? '#f0e8d5' : '#6e6880',
+                            background: pickerTab === tab ? '#1a181e' : 'transparent',
+                            color: pickerTab === tab ? '#f0e8d5' : '#6e6880',
+                            borderBottom: pickerTab === tab ? '2px solid #c0392b' : '2px solid transparent',
                           }}>
-                          {mg}
+                          {tab === 'browse' ? 'Browse' : '+ Create New'}
                         </button>
                       ))}
                     </div>
-                    <div className="p-2 border-b border-iron">
-                      <input className="input-dark w-full px-3 py-1.5 text-xs"
-                        placeholder="Search exercises..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        autoFocus />
-                    </div>
-                    <div className="max-h-40 overflow-y-auto">
-                      {filteredExercises(day).length === 0 ? (
-                        <p className="text-ghost text-xs p-3 tracking-wide">No exercises found</p>
-                      ) : (
-                        filteredExercises(day).map(ex => (
-                          <button key={ex.id} onClick={() => addExerciseToDay(day, ex)}
-                            className="w-full text-left px-3 py-2 transition-all duration-150 border-b border-iron/30"
-                            style={{ background: 'transparent' }}
-                            onMouseEnter={e => (e.currentTarget.style.background = '#1a181e')}
-                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                            <p className="font-title text-sm text-bone">{ex.name}</p>
-                            <p className="text-ghost text-[10px] uppercase tracking-wide">
-                              {ex.muscle_group}{ex.equipment ? ` · ${ex.equipment}` : ''}
-                            </p>
-                          </button>
-                        ))
-                      )}
-                    </div>
+
+                    {pickerTab === 'browse' ? (
+                      <>
+                        <div className="flex flex-wrap gap-0.5 p-2 border-b border-iron">
+                          {MUSCLE_GROUPS.map(mg => (
+                            <button key={mg} onClick={() => setFilter(mg)}
+                              className="font-title text-[9px] tracking-widest uppercase px-2 py-1 transition-all duration-150"
+                              style={{ background: filter === mg ? '#7a0000' : 'transparent', color: filter === mg ? '#f0e8d5' : '#6e6880' }}>
+                              {mg}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="p-2 border-b border-iron">
+                          <input className="input-dark w-full px-3 py-1.5 text-xs"
+                            placeholder="Search exercises..." value={search}
+                            onChange={e => setSearch(e.target.value)} autoFocus />
+                        </div>
+                        <div className="max-h-40 overflow-y-auto">
+                          {filteredExercises(day).length === 0
+                            ? <p className="text-ghost text-xs p-3 tracking-wide">No exercises found</p>
+                            : filteredExercises(day).map(ex => (
+                              <button key={ex.id} onClick={() => addExerciseToDay(day, ex)}
+                                className="w-full text-left px-3 py-2 transition-all duration-150 border-b border-iron/30"
+                                style={{ background: 'transparent' }}
+                                onMouseEnter={e => (e.currentTarget.style.background = '#1a181e')}
+                                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-title text-sm text-bone">{ex.name}</p>
+                                  {ex.is_custom && (
+                                    <span className="text-[9px] font-title tracking-widest uppercase px-1 py-0.5"
+                                      style={{ background: '#2e1a1a', border: '1px solid #7a0000', color: '#e74c3c' }}>
+                                      custom
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-ghost text-[10px] uppercase tracking-wide">
+                                  {ex.muscle_group}{ex.equipment ? ` · ${ex.equipment}` : ''}
+                                </p>
+                              </button>
+                            ))
+                          }
+                        </div>
+                      </>
+                    ) : (
+                      <div className="p-4 flex flex-col gap-3">
+                        <div>
+                          <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">Exercise Name *</label>
+                          <input className="input-dark w-full px-3 py-2 text-sm"
+                            placeholder="e.g. Hack Squat" value={newName}
+                            onChange={e => setNewName(e.target.value)} autoFocus />
+                        </div>
+                        <div>
+                          <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">Muscle Group *</label>
+                          <select className="input-dark w-full px-3 py-2 text-sm" value={newMuscle}
+                            onChange={e => setNewMuscle(e.target.value)} style={{ background: '#1a181e' }}>
+                            {MUSCLE_GROUPS.filter(m => m !== 'all').map(m => (
+                              <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">
+                            Equipment <span className="text-ghost/50">(optional)</span>
+                          </label>
+                          <input className="input-dark w-full px-3 py-2 text-sm"
+                            placeholder="barbell, dumbbell..." value={newEquipment}
+                            onChange={e => setNewEquipment(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleCreateExercise(day)} />
+                        </div>
+                        {createError && (
+                          <p className="text-ember text-xs border border-blood/50 bg-rust/30 px-3 py-2">{createError}</p>
+                        )}
+                        <button className="btn-primary" onClick={() => handleCreateExercise(day)}
+                          disabled={creating} style={{ opacity: creating ? 0.6 : 1 }}>
+                          {creating ? 'Creating...' : 'Create & Add'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
-
               </div>
             ))}
           </div>
