@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useWorkoutStore } from '@/lib/store/workout'
 import { createSession, saveSets, closeSession, createCustomExercise } from '@/lib/mutations/sessions'
 import type { Exercise } from '@/types/database'
+import RestTimer from '@/components/workout/RestTimer'
+
 
 interface Props {
   exercises: Exercise[]
@@ -363,7 +365,11 @@ export default function WorkoutTracker({
                     placeholder="—" min="1" max="10"
                   />
                   <button
-                    onClick={() => store.toggleSetComplete(store.currentExerciseIdx, setIdx)}
+                    onClick={() => {
+                      const wasCompleted = s.completed
+                      store.toggleSetComplete(store.currentExerciseIdx, setIdx)
+                      if (!wasCompleted) store.startTimer() // arranca solo al completar
+                    }}
                     className="w-full h-10 flex items-center justify-center transition-all duration-200 text-base"
                     style={{
                       background: s.completed ? '#7a0000' : '#1a181e',
@@ -410,7 +416,8 @@ export default function WorkoutTracker({
 
   return (
     <div className="p-4 md:p-10 min-h-screen pb-24 md:pb-10">
-
+      <RestTimer />
+      <div className="flex flex-col gap-2 mb-4"></div>
       {/* Header */}
       <header className="mb-6 pb-4 border-b border-ghost/30 relative flex items-start justify-between">
         <div className="absolute bottom-0 left-0 right-0 h-px"
