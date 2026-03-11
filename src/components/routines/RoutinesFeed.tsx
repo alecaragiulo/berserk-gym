@@ -9,13 +9,14 @@ import type { RoutineWithAuthor, RoutineWithExercises } from '@/lib/queries/rout
 interface Props {
   publicRoutines: RoutineWithAuthor[]
   myRoutines: RoutineWithExercises[]
+  subscribedRoutines: RoutineWithAuthor[]
   subscribedIds: number[]
   userId: string
 }
 
 type Tab = 'codex' | 'mine'
 
-export default function RoutinesFeed({ publicRoutines, myRoutines, subscribedIds, userId }: Props) {
+export default function RoutinesFeed({ publicRoutines, myRoutines, subscribedRoutines, subscribedIds, userId }: Props) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('codex')
   const [subs, setSubs] = useState<Set<number>>(new Set(subscribedIds))
@@ -52,6 +53,8 @@ export default function RoutinesFeed({ publicRoutines, myRoutines, subscribedIds
     router.push(`/workout?routineId=${routineId}&day=${day}`)
   }
 
+  const totalMine = myRoutines.length + subscribedRoutines.length
+
   return (
     <div className="p-4 md:p-10 pb-24 md:pb-10">
 
@@ -85,10 +88,10 @@ export default function RoutinesFeed({ publicRoutines, myRoutines, subscribedIds
               marginBottom: '-1px',
             }}>
             {label}
-            {t === 'mine' && myRoutines.length > 0 && (
+            {t === 'mine' && totalMine > 0 && (
               <span className="ml-2 font-title text-[10px] px-1.5 py-0.5"
                 style={{ background: '#2e1a1a', border: '1px solid #7a0000', color: '#e74c3c' }}>
-                {myRoutines.length}
+                {totalMine}
               </span>
             )}
           </button>
@@ -175,146 +178,231 @@ export default function RoutinesFeed({ publicRoutines, myRoutines, subscribedIds
 
       {/* ── MY ROUTINES TAB ── */}
       {tab === 'mine' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {myRoutines.length === 0 ? (
-            <div className="col-span-2 flex flex-col items-center justify-center py-24 gap-4">
-              <p className="text-ghost font-title text-xs tracking-widest uppercase">No routines forged yet</p>
-              <Link href="/routines/create"
-                className="font-title text-xs tracking-widest uppercase px-6 py-2 transition-all duration-150"
-                style={{ background: '#7a0000', border: '1px solid #c0392b', color: '#f0e8d5' }}>
-                + Forge Your First Routine
-              </Link>
+        <div className="flex flex-col gap-10">
+
+          {/* ── Mis rutinas ── */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <p className="font-title text-[10px] tracking-widest uppercase text-ghost">My Routines</p>
+              {myRoutines.length > 0 && (
+                <span className="font-title text-[10px] px-1.5 py-0.5"
+                  style={{ background: '#2e1a1a', border: '1px solid #7a0000', color: '#e74c3c' }}>
+                  {myRoutines.length}
+                </span>
+              )}
             </div>
-          ) : (
-            myRoutines.map(routine => {
-              const isExpanded = expandedRoutine === routine.id
-              const days = Array.from(new Set(routine.routine_exercises.map(re => re.day_number))).sort()
 
-              return (
-                <div key={routine.id}
-                  className="flex flex-col transition-all duration-200"
-                  style={{
-                    background: '#0e0d10',
-                    border: `1px solid ${isExpanded ? '#7a0000' : '#1a181e'}`,
-                  }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {myRoutines.length === 0 ? (
+                <div className="col-span-2 flex flex-col items-center justify-center py-16 gap-4"
+                  style={{ border: '1px dashed #2e1a1a' }}>
+                  <p className="text-ghost font-title text-xs tracking-widest uppercase">No routines forged yet</p>
+                  <Link href="/routines/create"
+                    className="font-title text-xs tracking-widest uppercase px-6 py-2"
+                    style={{ background: '#7a0000', border: '1px solid #c0392b', color: '#f0e8d5' }}>
+                    + Forge Your First Routine
+                  </Link>
+                </div>
+              ) : (
+                myRoutines.map(routine => {
+                  const isExpanded = expandedRoutine === routine.id
+                  const days = Array.from(new Set(routine.routine_exercises.map(re => re.day_number))).sort()
 
-                  {/* Card header */}
-                  <div className="p-5 cursor-pointer select-none"
-                    onClick={() => setExpandedRoutine(isExpanded ? null : routine.id)}>
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-title text-base font-bold text-bone leading-snug">{routine.name}</p>
-                        {routine.description && (
-                          <p className="text-ghost text-xs mt-1 leading-relaxed line-clamp-2">{routine.description}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {routine.is_public && (
-                          <span className="text-[9px] font-title tracking-widest uppercase px-1.5 py-0.5"
-                            style={{ background: '#0e2a1a', border: '1px solid #1a5c3a', color: '#4caf7d' }}>
-                            public
+                  return (
+                    <div key={routine.id}
+                      className="flex flex-col transition-all duration-200"
+                      style={{
+                        background: '#0e0d10',
+                        border: `1px solid ${isExpanded ? '#7a0000' : '#1a181e'}`,
+                      }}>
+
+                      {/* Card header */}
+                      <div className="p-5 cursor-pointer select-none"
+                        onClick={() => setExpandedRoutine(isExpanded ? null : routine.id)}>
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-title text-base font-bold text-bone leading-snug">{routine.name}</p>
+                            {routine.description && (
+                              <p className="text-ghost text-xs mt-1 leading-relaxed line-clamp-2">{routine.description}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {routine.is_public && (
+                              <span className="text-[9px] font-title tracking-widest uppercase px-1.5 py-0.5"
+                                style={{ background: '#0e2a1a', border: '1px solid #1a5c3a', color: '#4caf7d' }}>
+                                public
+                              </span>
+                            )}
+                            <span className="text-ghost text-lg">{isExpanded ? '▲' : '▼'}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-title text-[10px] tracking-widest uppercase px-2.5 py-1"
+                            style={{ background: '#1a181e', border: '1px solid #4a4455', color: '#6e6880' }}>
+                            {routine.days_per_week}d / week
                           </span>
-                        )}
-                        <span className="text-ghost text-lg">{isExpanded ? '▲' : '▼'}</span>
+                          <span className="font-title text-[10px] tracking-widest uppercase px-2.5 py-1"
+                            style={{ background: '#1a181e', border: '1px solid #4a4455', color: '#6e6880' }}>
+                            {routine.routine_exercises.length} exercises
+                          </span>
+                          <span className="font-title text-[10px] tracking-widest uppercase px-2.5 py-1"
+                            style={{ background: '#1a181e', border: '1px solid #4a4455', color: '#6e6880' }}>
+                            {days.length} days
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-title text-[10px] tracking-widest uppercase px-2.5 py-1"
-                        style={{ background: '#1a181e', border: '1px solid #4a4455', color: '#6e6880' }}>
-                        {routine.days_per_week}d / week
-                      </span>
-                      <span className="font-title text-[10px] tracking-widest uppercase px-2.5 py-1"
-                        style={{ background: '#1a181e', border: '1px solid #4a4455', color: '#6e6880' }}>
-                        {routine.routine_exercises.length} exercises
-                      </span>
-                      <span className="font-title text-[10px] tracking-widest uppercase px-2.5 py-1"
-                        style={{ background: '#1a181e', border: '1px solid #4a4455', color: '#6e6880' }}>
-                        {days.length} days
-                      </span>
-                    </div>
-                  </div>
 
-                  {/* Días expandidos */}
-                  {isExpanded && (
-                    <div style={{ borderTop: '1px solid #1a181e' }}>
-                      {days.map(day => {
-                        const dayExs = routine.routine_exercises
-                          .filter(re => re.day_number === day)
-                          .sort((a, b) => a.position - b.position)
+                      {/* Días expandidos */}
+                      {isExpanded && (
+                        <div style={{ borderTop: '1px solid #1a181e' }}>
+                          {days.map(day => {
+                            const dayExs = routine.routine_exercises
+                              .filter(re => re.day_number === day)
+                              .sort((a, b) => a.position - b.position)
 
-                        const muscleGroups = Array.from(new Set(
-                          dayExs.map(re => (re.exercises as { muscle_group: string })?.muscle_group).filter(Boolean)
-                        ))
+                            const muscleGroups = Array.from(new Set(
+                              dayExs.map(re => (re.exercises as { muscle_group: string })?.muscle_group).filter(Boolean)
+                            ))
 
-                        return (
-                          <div key={day}
-                            className="flex items-center gap-4 px-5 py-4 transition-all duration-150 cursor-pointer"
-                            style={{ borderBottom: '1px solid #1a181e' }}
-                            onClick={() => startWorkout(routine.id, day)}
-                            onMouseEnter={e => (e.currentTarget.style.background = '#1a181e')}
-                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                            return (
+                              <div key={day}
+                                className="flex items-center gap-4 px-5 py-4 transition-all duration-150 cursor-pointer"
+                                style={{ borderBottom: '1px solid #1a181e' }}
+                                onClick={() => startWorkout(routine.id, day)}
+                                onMouseEnter={e => (e.currentTarget.style.background = '#1a181e')}
+                                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
 
-                            {/* Day number */}
-                            <div className="flex-shrink-0 w-12 h-12 flex flex-col items-center justify-center"
-                              style={{ border: '1px solid #7a0000', background: '#2e1a1a' }}>
-                              <p className="font-title text-[9px] tracking-widest uppercase text-ghost">Day</p>
-                              <p className="font-display text-lg text-crimson leading-none">{day}</p>
-                            </div>
+                                <div className="flex-shrink-0 w-12 h-12 flex flex-col items-center justify-center"
+                                  style={{ border: '1px solid #7a0000', background: '#2e1a1a' }}>
+                                  <p className="font-title text-[9px] tracking-widest uppercase text-ghost">Day</p>
+                                  <p className="font-display text-lg text-crimson leading-none">{day}</p>
+                                </div>
 
-                            {/* Info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex flex-wrap gap-1 mb-1">
-                                {muscleGroups.slice(0, 4).map((mg: string) => (
-                                  <span key={mg} className="font-title text-[9px] tracking-widest uppercase px-1.5 py-0.5"
-                                    style={{ background: '#1a181e', border: '1px solid #4a4455', color: '#b0a8bc' }}>
-                                    {mg}
-                                  </span>
-                                ))}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex flex-wrap gap-1 mb-1">
+                                    {muscleGroups.slice(0, 4).map((mg: string) => (
+                                      <span key={mg} className="font-title text-[9px] tracking-widest uppercase px-1.5 py-0.5"
+                                        style={{ background: '#1a181e', border: '1px solid #4a4455', color: '#b0a8bc' }}>
+                                        {mg}
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <p className="text-ghost text-[10px] tracking-wide">
+                                    {dayExs.length} exercises · {dayExs.reduce((sum, re) => sum + re.target_sets, 0)} sets total
+                                  </p>
+                                </div>
+
+                                <button
+                                  className="flex-shrink-0 font-title text-xs tracking-widest uppercase px-4 py-2.5 transition-all duration-150"
+                                  style={{ background: '#7a0000', border: '1px solid #c0392b', color: '#f0e8d5' }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = '#c0392b')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = '#7a0000')}
+                                  onClick={e => { e.stopPropagation(); startWorkout(routine.id, day) }}>
+                                  ⚔ Start
+                                </button>
                               </div>
-                              <p className="text-ghost text-[10px] tracking-wide">
-                                {dayExs.length} exercises · {dayExs.reduce((sum, re) => sum + re.target_sets, 0)} sets total
-                              </p>
-                            </div>
+                            )
+                          })}
 
-                            {/* Start */}
+                          <div className="flex items-center justify-end gap-2 px-5 py-3"
+                            style={{ borderTop: '1px solid #1a181e' }}>
+                            <Link href={`/routines/edit/${routine.id}`}
+                              className="font-title text-[10px] tracking-widest uppercase px-3 py-1.5 transition-all duration-150"
+                              style={{ border: '1px solid #4a4455', color: '#6e6880' }}
+                              onMouseEnter={e => { e.currentTarget.style.borderColor = '#6e6880'; e.currentTarget.style.color = '#b0a8bc' }}
+                              onMouseLeave={e => { e.currentTarget.style.borderColor = '#4a4455'; e.currentTarget.style.color = '#6e6880' }}>
+                              Edit
+                            </Link>
                             <button
-                              className="flex-shrink-0 font-title text-xs tracking-widest uppercase px-4 py-2.5 transition-all duration-150"
-                              style={{ background: '#7a0000', border: '1px solid #c0392b', color: '#f0e8d5' }}
-                              onMouseEnter={e => (e.currentTarget.style.background = '#c0392b')}
-                              onMouseLeave={e => (e.currentTarget.style.background = '#7a0000')}
-                              onClick={e => { e.stopPropagation(); startWorkout(routine.id, day) }}>
-                              ⚔ Start
+                              onClick={() => handleDelete(routine.id)}
+                              disabled={deletingId === routine.id}
+                              className="font-title text-[10px] tracking-widest uppercase px-3 py-1.5 transition-all duration-150"
+                              style={{ border: '1px solid #2e1a1a', color: '#6e6880', opacity: deletingId === routine.id ? 0.5 : 1 }}
+                              onMouseEnter={e => { e.currentTarget.style.borderColor = '#7a0000'; e.currentTarget.style.color = '#e74c3c' }}
+                              onMouseLeave={e => { e.currentTarget.style.borderColor = '#2e1a1a'; e.currentTarget.style.color = '#6e6880' }}>
+                              {deletingId === routine.id ? '...' : 'Delete'}
                             </button>
                           </div>
-                        )
-                      })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
 
-                      {/* Edit / Delete */}
-                      <div className="flex items-center justify-end gap-2 px-5 py-3"
-                        style={{ borderTop: '1px solid #1a181e' }}>
-                        <Link href={`/routines/edit/${routine.id}`}
-                          className="font-title text-[10px] tracking-widest uppercase px-3 py-1.5 transition-all duration-150"
-                          style={{ border: '1px solid #4a4455', color: '#6e6880' }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = '#6e6880'; e.currentTarget.style.color = '#b0a8bc' }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = '#4a4455'; e.currentTarget.style.color = '#6e6880' }}>
-                          Edit
-                        </Link>
-                        <button
-                          onClick={() => handleDelete(routine.id)}
-                          disabled={deletingId === routine.id}
-                          className="font-title text-[10px] tracking-widest uppercase px-3 py-1.5 transition-all duration-150"
-                          style={{ border: '1px solid #2e1a1a', color: '#6e6880', opacity: deletingId === routine.id ? 0.5 : 1 }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = '#7a0000'; e.currentTarget.style.color = '#e74c3c' }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = '#2e1a1a'; e.currentTarget.style.color = '#6e6880' }}>
-                          {deletingId === routine.id ? '...' : 'Delete'}
-                        </button>
+          {/* ── Rutinas seguidas ── */}
+          {subscribedRoutines.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <p className="font-title text-[10px] tracking-widest uppercase text-ghost">Following</p>
+                <span className="font-title text-[10px] px-1.5 py-0.5"
+                  style={{ background: '#1a181e', border: '1px solid #4a4455', color: '#6e6880' }}>
+                  {subscribedRoutines.length}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {subscribedRoutines.map(routine => (
+                  <div key={routine.id}
+                    className="flex flex-col transition-all duration-200"
+                    style={{ background: '#0e0d10', border: '1px solid #1a181e' }}>
+
+                    <div className="p-5">
+                      <Link
+                        href={`/profile/${(routine.profiles as { username: string })?.username}`}
+                        className="text-ghost text-[10px] tracking-[0.2em] uppercase mb-2 block hover:text-ash transition-colors">
+                        {(routine.profiles as { username: string })?.username ?? 'unknown'}
+                      </Link>
+                      <p className="font-title text-base font-bold text-bone mb-1 leading-snug">{routine.name}</p>
+                      {routine.description && (
+                        <p className="text-ghost text-xs mb-3 leading-relaxed line-clamp-2">{routine.description}</p>
+                      )}
+                      <div className="flex items-center gap-2 flex-wrap mb-4">
+                        <span className="font-title text-[10px] tracking-widest uppercase px-2.5 py-1"
+                          style={{ background: '#1a181e', border: '1px solid #4a4455', color: '#6e6880' }}>
+                          {routine.days_per_week}d / week
+                        </span>
+                        {routine.tags?.slice(0, 2).map((tag: string, i: number) => (
+                          <span key={i} className="font-title text-[10px] tracking-widest uppercase px-2.5 py-1"
+                            style={{ background: '#1a181e', border: '1px solid #4a4455', color: '#6e6880' }}>
+                            {tag}
+                          </span>
+                        ))}
                       </div>
                     </div>
-                  )}
-                </div>
-              )
-            })
+
+                    <div className="px-5 pb-5 flex items-center justify-between"
+                      style={{ borderTop: '1px solid #1a181e', paddingTop: '12px' }}>
+                      <button
+                        onClick={() => toggleSubscription(routine.id)}
+                        disabled={loading === routine.id}
+                        className="font-title text-[10px] tracking-widest uppercase px-3 py-1.5 transition-all duration-150"
+                        style={{
+                          border: '1px solid #4a4455',
+                          color: '#6e6880',
+                          opacity: loading === routine.id ? 0.5 : 1,
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#7a0000'; e.currentTarget.style.color = '#e74c3c' }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#4a4455'; e.currentTarget.style.color = '#6e6880' }}>
+                        {loading === routine.id ? '...' : 'Unfollow'}
+                      </button>
+                      <button
+                        onClick={() => router.push(`/routines/start/${routine.id}`)}
+                        className="font-title text-xs tracking-widest uppercase px-4 py-2.5 transition-all duration-150"
+                        style={{ background: '#7a0000', border: '1px solid #c0392b', color: '#f0e8d5' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#c0392b')}
+                        onMouseLeave={e => (e.currentTarget.style.background = '#7a0000')}>
+                        ⚔ Start
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
+
         </div>
       )}
     </div>

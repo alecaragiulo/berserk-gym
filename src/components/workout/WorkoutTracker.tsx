@@ -3,9 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useWorkoutStore } from '@/lib/store/workout'
 import { createSession, saveSets, closeSession, createCustomExercise } from '@/lib/mutations/sessions'
-import type { Exercise } from '@/types/database'
 import RestTimer from '@/components/workout/RestTimer'
-
+import type { Exercise } from '@/types/database'
 
 interface Props {
   exercises: Exercise[]
@@ -39,24 +38,21 @@ export default function WorkoutTracker({
   const [newEquipment, setNewEquipment] = useState('')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
-
   const [localExercises, setLocalExercises] = useState<Exercise[]>(exercises)
 
   useEffect(() => {
     if (sessionStarted.current) return
     sessionStarted.current = true
-  
-    // Resetear siempre al arrancar una sesión nueva
     store.resetSession()
-  
+
     const sessionName = routineName && routineDay
       ? `${routineName} — Day ${routineDay}`
       : 'Quick Session'
-  
+
     createSession(userId, routineId ?? undefined).then(id => {
       if (!id) return
       store.startSession(id, sessionName)
-  
+
       if (preloadedExercises.length > 0) {
         preloadedExercises.forEach((re: any, idx: number) => {
           const exercise = exercises.find(ex => ex.id === re.exercise_id)
@@ -83,8 +79,6 @@ export default function WorkoutTracker({
     setSearch('')
     setMobileTab('logger')
   }
-
-  const removeExercise = (idx: number) => store.removeExercise(idx)
 
   const handleCreateExercise = async () => {
     if (!newName.trim()) { setCreateError('Name is required'); return }
@@ -136,8 +130,8 @@ export default function WorkoutTracker({
   const progress = store.getProgress()
   const currentEx = store.activeExercises[store.currentExerciseIdx]
 
-  // ── Exercise Picker ──
-  const ExercisePicker = () => (
+  // ── JSX compartido: Exercise Picker ──
+  const exercisePickerJSX = showExercisePicker && (
     <div className="border border-iron" style={{ background: '#0e0d10' }}>
       <div className="flex border-b border-iron">
         {(['browse', 'create'] as PickerTab[]).map(tab => (
@@ -233,8 +227,8 @@ export default function WorkoutTracker({
     </div>
   )
 
-  // ── Exercise List ──
-  const ExerciseList = () => (
+  // ── JSX compartido: Exercise List ──
+  const exerciseListJSX = (
     <>
       <div className="h-0.5 bg-iron mb-1 overflow-hidden">
         <div className="h-full transition-all duration-500"
@@ -284,7 +278,7 @@ export default function WorkoutTracker({
                     ))}
                   </div>
                   <button
-                    onClick={e => { e.stopPropagation(); removeExercise(i) }}
+                    onClick={e => { e.stopPropagation(); store.removeExercise(i) }}
                     className="opacity-0 group-hover:opacity-100 transition-opacity w-5 h-5 flex items-center justify-center text-ghost hover:text-ember text-xs">
                     ✕
                   </button>
@@ -305,119 +299,116 @@ export default function WorkoutTracker({
         {showExercisePicker ? '✕ Close' : '+ Add Exercise'}
       </button>
 
-      {showExercisePicker && <ExercisePicker />}
+      {exercisePickerJSX}
     </>
   )
 
-  // ── Set Logger ──
-  const SetLogger = () => (
-    <>
-      {currentEx ? (
-        <div className="p-4 md:p-6"
-          style={{ background: '#0e0d10', border: '1px solid #1a181e', borderTopColor: '#c0392b', borderTopWidth: '3px' }}>
-          <div className="flex items-center gap-3 mb-1">
-            <h2 className="font-display text-lg md:text-xl text-bone">{currentEx.exercise.name}</h2>
-            {currentEx.exercise.is_custom && (
-              <span className="text-[9px] font-title tracking-widest uppercase px-1.5 py-0.5"
-                style={{ background: '#2e1a1a', border: '1px solid #7a0000', color: '#e74c3c' }}>
-                custom
-              </span>
-            )}
-          </div>
-          <p className="text-ghost text-xs tracking-widest uppercase mb-5">
-            {currentEx.exercise.muscle_group} · {currentEx.sets.length} sets
-          </p>
+  // ── JSX compartido: Set Logger ──
+  const setLoggerJSX = currentEx ? (
+    <div className="p-4 md:p-6"
+      style={{ background: '#0e0d10', border: '1px solid #1a181e', borderTopColor: '#c0392b', borderTopWidth: '3px' }}>
+      <div className="flex items-center gap-3 mb-1">
+        <h2 className="font-display text-lg md:text-xl text-bone">{currentEx.exercise.name}</h2>
+        {currentEx.exercise.is_custom && (
+          <span className="text-[9px] font-title tracking-widest uppercase px-1.5 py-0.5"
+            style={{ background: '#2e1a1a', border: '1px solid #7a0000', color: '#e74c3c' }}>
+            custom
+          </span>
+        )}
+      </div>
+      <p className="text-ghost text-xs tracking-widest uppercase mb-4">
+        {currentEx.exercise.muscle_group} · {currentEx.sets.length} sets
+      </p>
 
-          <div className="flex flex-col gap-2 mb-4">
-            <div className="grid grid-cols-5 gap-2 pb-2" style={{ borderBottom: '1px solid #1a181e' }}>
-              {['Set', 'kg', 'Reps', 'RPE', '✓'].map(h => (
-                <p key={h} className="font-title text-[10px] tracking-widest text-ghost uppercase text-center">{h}</p>
-              ))}
-            </div>
+      <RestTimer />
 
-            {currentEx.sets.map((s, setIdx) => {
-              const last = lastSets[currentEx.exercise.id]?.[setIdx]
-              const weightPlaceholder = last?.weight_kg != null ? String(last.weight_kg) : '—'
-              const repsPlaceholder = last?.reps != null ? String(last.reps) : '—'
+      <div className="flex flex-col gap-2 mb-4">
+        <div className="grid grid-cols-5 gap-2 pb-2" style={{ borderBottom: '1px solid #1a181e' }}>
+          {['Set', 'kg', 'Reps', 'RPE', '✓'].map(h => (
+            <p key={h} className="font-title text-[10px] tracking-widest text-ghost uppercase text-center">{h}</p>
+          ))}
+        </div>
 
-              return (
-                <div key={setIdx}
-                  className="grid grid-cols-5 gap-2 items-center py-1"
-                  style={{ opacity: s.completed ? 0.6 : 1 }}>
-                  <p className="font-title text-xs text-ghost tracking-wide text-center">{setIdx + 1}</p>
-                  <input
-                    className="input-dark w-full px-1 py-2.5 text-center text-sm font-semibold"
-                    type="number" inputMode="decimal"
-                    placeholder={weightPlaceholder}
-                    value={s.weightKg}
-                    onChange={e => store.updateSet(store.currentExerciseIdx, setIdx, 'weightKg', e.target.value)}
-                  />
-                  <input
-                    className="input-dark w-full px-1 py-2.5 text-center text-sm font-semibold"
-                    type="number" inputMode="numeric"
-                    placeholder={repsPlaceholder}
-                    value={s.reps}
-                    onChange={e => store.updateSet(store.currentExerciseIdx, setIdx, 'reps', e.target.value)}
-                  />
-                  <input
-                    className="input-dark w-full px-1 py-2.5 text-center text-sm"
-                    type="number" inputMode="numeric"
-                    placeholder="—" min="1" max="10"
-                  />
-                  <button
-                    onClick={() => {
-                      const wasCompleted = s.completed
-                      store.toggleSetComplete(store.currentExerciseIdx, setIdx)
-                      if (!wasCompleted) store.startTimer() // arranca solo al completar
-                    }}
-                    className="w-full h-10 flex items-center justify-center transition-all duration-200 text-base"
-                    style={{
-                      background: s.completed ? '#7a0000' : '#1a181e',
-                      border: `1px solid ${s.completed ? '#c0392b' : '#6e6880'}`,
-                      color: s.completed ? '#e74c3c' : '#6e6880',
-                      boxShadow: s.completed ? '0 0 10px rgba(192,57,43,0.3)' : 'none',
-                    }}>
-                    {s.completed ? '✓' : '○'}
-                  </button>
-                </div>
-              )
-            })}
-          </div>
+        {currentEx.sets.map((s, setIdx) => {
+          const last = lastSets[currentEx.exercise.id]?.[setIdx]
+          const weightPlaceholder = last?.weight_kg != null ? String(last.weight_kg) : '—'
+          const repsPlaceholder = last?.reps != null ? String(last.reps) : '—'
 
-          <div className="flex gap-2">
-            <button onClick={() => store.addSet(store.currentExerciseIdx)}
-              className="font-title text-xs tracking-widest uppercase text-ghost hover:text-ash transition-colors border border-ghost/30 hover:border-ghost px-4 py-2.5 flex-1">
-              + Add Set
-            </button>
-            {currentEx.sets.length > 1 && (
-              <button onClick={() => store.removeSet(store.currentExerciseIdx)}
-                className="font-title text-xs tracking-widest uppercase px-4 py-2.5 flex-1 transition-all duration-150"
-                style={{ color: '#6e6880', border: '1px solid #2e1a1a' }}
-                onMouseEnter={e => { e.currentTarget.style.color = '#e74c3c'; e.currentTarget.style.borderColor = '#7a0000' }}
-                onMouseLeave={e => { e.currentTarget.style.color = '#6e6880'; e.currentTarget.style.borderColor = '#2e1a1a' }}>
-                − Remove Set
+          return (
+            <div key={setIdx}
+              className="grid grid-cols-5 gap-2 items-center py-1"
+              style={{ opacity: s.completed ? 0.6 : 1 }}>
+              <p className="font-title text-xs text-ghost tracking-wide text-center">{setIdx + 1}</p>
+              <input
+                className="input-dark w-full px-1 py-2.5 text-center text-sm font-semibold"
+                type="number" inputMode="decimal"
+                placeholder={weightPlaceholder}
+                value={s.weightKg}
+                onChange={e => store.updateSet(store.currentExerciseIdx, setIdx, 'weightKg', e.target.value)}
+              />
+              <input
+                className="input-dark w-full px-1 py-2.5 text-center text-sm font-semibold"
+                type="number" inputMode="numeric"
+                placeholder={repsPlaceholder}
+                value={s.reps}
+                onChange={e => store.updateSet(store.currentExerciseIdx, setIdx, 'reps', e.target.value)}
+              />
+              <input
+                className="input-dark w-full px-1 py-2.5 text-center text-sm"
+                type="number" inputMode="numeric"
+                placeholder="—" min="1" max="10"
+              />
+              <button
+                onClick={() => {
+                  const wasCompleted = s.completed
+                  store.toggleSetComplete(store.currentExerciseIdx, setIdx)
+                  if (!wasCompleted) store.startTimer()
+                }}
+                className="w-full h-10 flex items-center justify-center transition-all duration-200 text-base"
+                style={{
+                  background: s.completed ? '#7a0000' : '#1a181e',
+                  border: `1px solid ${s.completed ? '#c0392b' : '#6e6880'}`,
+                  color: s.completed ? '#e74c3c' : '#6e6880',
+                  boxShadow: s.completed ? '0 0 10px rgba(192,57,43,0.3)' : 'none',
+                }}>
+                {s.completed ? '✓' : '○'}
               </button>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center h-48 gap-4"
-          style={{ border: '1px dashed #2e1a1a' }}>
-          <p className="text-ghost font-title text-xs tracking-widest uppercase">Add an exercise to begin</p>
-          <button onClick={() => { setShowExercisePicker(true); setMobileTab('exercises') }}
-            className="font-title text-xs tracking-widest uppercase px-6 py-2.5"
-            style={{ background: '#7a0000', border: '1px solid #c0392b', color: '#f0e8d5' }}>
-            + Add Exercise
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="flex gap-2">
+        <button onClick={() => store.addSet(store.currentExerciseIdx)}
+          className="font-title text-xs tracking-widest uppercase text-ghost hover:text-ash transition-colors border border-ghost/30 hover:border-ghost px-4 py-2.5 flex-1">
+          + Add Set
+        </button>
+        {currentEx.sets.length > 1 && (
+          <button onClick={() => store.removeSet(store.currentExerciseIdx)}
+            className="font-title text-xs tracking-widest uppercase px-4 py-2.5 flex-1 transition-all duration-150"
+            style={{ color: '#6e6880', border: '1px solid #2e1a1a' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#e74c3c'; e.currentTarget.style.borderColor = '#7a0000' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#6e6880'; e.currentTarget.style.borderColor = '#2e1a1a' }}>
+            − Remove Set
           </button>
-        </div>
-      )}
-    </>
+        )}
+      </div>
+    </div>
+  ) : (
+    <div className="flex flex-col items-center justify-center h-48 gap-4"
+      style={{ border: '1px dashed #2e1a1a' }}>
+      <p className="text-ghost font-title text-xs tracking-widest uppercase">Add an exercise to begin</p>
+      <button onClick={() => { setShowExercisePicker(true); setMobileTab('exercises') }}
+        className="font-title text-xs tracking-widest uppercase px-6 py-2.5"
+        style={{ background: '#7a0000', border: '1px solid #c0392b', color: '#f0e8d5' }}>
+        + Add Exercise
+      </button>
+    </div>
   )
 
   return (
     <div className="p-4 md:p-10 min-h-screen pb-24 md:pb-10">
-      <RestTimer />
-      <div className="flex flex-col gap-2 mb-4"></div>
+
       {/* Header */}
       <header className="mb-6 pb-4 border-b border-ghost/30 relative flex items-start justify-between">
         <div className="absolute bottom-0 left-0 right-0 h-px"
@@ -430,9 +421,6 @@ export default function WorkoutTracker({
           {routineName && routineDay && (
             <p className="text-ghost text-xs tracking-widest uppercase mt-1">{routineName} · Day {routineDay}</p>
           )}
-          {!routineName && (
-            <p className="text-ghost text-xs tracking-widest uppercase mt-1">Quick Session</p>
-          )}
         </div>
         <button className="btn-primary w-36 md:w-48 text-xs" onClick={finishSession}
           disabled={saving} style={{ opacity: saving ? 0.6 : 1 }}>
@@ -440,14 +428,14 @@ export default function WorkoutTracker({
         </button>
       </header>
 
-      {/* ── Desktop: grid ── */}
+      {/* ── Desktop ── */}
       <div className="hidden md:grid grid-cols-5 gap-6">
         <div className="col-span-2">
           <div className="section-label mb-4">Exercises</div>
-          <ExerciseList />
+          {exerciseListJSX}
         </div>
         <div className="col-span-3">
-          <SetLogger />
+          {setLoggerJSX}
         </div>
       </div>
 
@@ -476,10 +464,11 @@ export default function WorkoutTracker({
         {mobileTab === 'exercises' && (
           <div>
             <div className="section-label mb-4">Exercises</div>
-            <ExerciseList />
+            {exerciseListJSX}
           </div>
         )}
-        {mobileTab === 'logger' && <SetLogger />}
+
+        {mobileTab === 'logger' && setLoggerJSX}
       </div>
     </div>
   )

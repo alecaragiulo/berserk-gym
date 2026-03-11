@@ -1,20 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { getProfile } from '@/lib/queries/profile'
-import { getPublicRoutines, getSubscribedIds, getMyRoutinesWithExercises } from '@/lib/queries/routines'
+import { getPublicRoutines, getSubscribedIds, getMyRoutinesWithExercises, getSubscribedRoutines  } from '@/lib/queries/routines'
 import Sidebar from '@/components/layout/Sidebar'
 import RoutinesFeed from '@/components/routines/RoutinesFeed'
+
 
 export default async function RoutinesPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [profile, publicRoutines, subscribedIds, myRoutines] = await Promise.all([
+  const [profile, publicRoutines, subscribedIds, myRoutines, subscribedRoutines] = await Promise.all([
     getProfile(user.id),
     getPublicRoutines(18),
     getSubscribedIds(user.id),
     getMyRoutinesWithExercises(),
+    getSubscribedRoutines(),
   ])
 
   return (
@@ -24,6 +26,7 @@ export default async function RoutinesPage() {
         <RoutinesFeed
           publicRoutines={publicRoutines}
           myRoutines={myRoutines}
+          subscribedRoutines={subscribedRoutines}
           subscribedIds={subscribedIds}
           userId={user.id}
         />

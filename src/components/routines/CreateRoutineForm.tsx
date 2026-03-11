@@ -278,16 +278,16 @@ export default function CreateRoutineForm({ exercises, userId }: Props) {
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1">
                             <input className="input-dark w-10 px-1.5 py-1 text-center text-xs"
-                              type="number" min="1" max="10" value={ex.target_sets}
-                              onChange={e => updateDayExercise(day, idx, 'target_sets', parseInt(e.target.value) || 3)} />
+                              type="number" inputMode="numeric" value={ex.target_sets}
+                              onChange={e => updateDayExercise(day, idx, 'target_sets', e.target.value === '' ? '' as any : parseInt(e.target.value))} />
                             <span className="text-ghost text-[10px] font-title">sets</span>
                           </div>
                           <span className="text-ghost text-[10px]">×</span>
                           <div className="flex items-center gap-1">
                             <input className="input-dark w-10 px-1.5 py-1 text-center text-xs"
-                              type="number" min="1" max="100" placeholder="—"
+                              type="number" inputMode="numeric" placeholder="—"
                               value={ex.target_reps ?? ''}
-                              onChange={e => updateDayExercise(day, idx, 'target_reps', parseInt(e.target.value) || null)} />
+                              onChange={e => updateDayExercise(day, idx, 'target_reps', e.target.value === '' ? null : parseInt(e.target.value))} />
                             <span className="text-ghost text-[10px] font-title">reps</span>
                           </div>
                         </div>
