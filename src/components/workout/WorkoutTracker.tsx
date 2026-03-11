@@ -41,17 +41,20 @@ export default function WorkoutTracker({
   const [localExercises, setLocalExercises] = useState<Exercise[]>(exercises)
 
   useEffect(() => {
-    if (sessionStarted.current || store.sessionId) return
+    if (sessionStarted.current) return
     sessionStarted.current = true
-
+  
+    // Resetear siempre al arrancar una sesión nueva
+    store.resetSession()
+  
     const sessionName = routineName && routineDay
       ? `${routineName} — Day ${routineDay}`
       : 'Quick Session'
-
+  
     createSession(userId, routineId ?? undefined).then(id => {
       if (!id) return
       store.startSession(id, sessionName)
-
+  
       if (preloadedExercises.length > 0) {
         preloadedExercises.forEach((re: any, idx: number) => {
           const exercise = exercises.find(ex => ex.id === re.exercise_id)
