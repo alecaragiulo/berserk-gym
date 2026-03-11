@@ -5,6 +5,7 @@ import { useWorkoutStore } from '@/lib/store/workout'
 import { createSession, saveSets, closeSession, createCustomExercise } from '@/lib/mutations/sessions'
 import RestTimer from '@/components/workout/RestTimer'
 import type { Exercise } from '@/types/database'
+import type { ExercisePR } from '@/lib/queries/sessions'
 
 interface Props {
   exercises: Exercise[]
@@ -14,14 +15,15 @@ interface Props {
   routineDay: number | null
   preloadedExercises: any[]
   lastSets: Record<number, { weight_kg: number | null; reps: number | null }[]>
+  prs: Record<number, ExercisePR>
 }
 
 const MUSCLE_GROUPS = ['all', 'chest', 'back', 'shoulders', 'legs', 'biceps', 'triceps']
 type PickerTab = 'browse' | 'create'
-type MobileTab = 'exercises' | 'logger'
 
 export default function WorkoutTracker({
-  exercises, userId, routineId, routineName, routineDay, preloadedExercises, lastSets
+  exercises, userId, routineId, routineName, routineDay,
+  preloadedExercises, lastSets, prs
 }: Props) {
   const store = useWorkoutStore()
   const sessionStarted = useRef(false)
@@ -31,7 +33,6 @@ export default function WorkoutTracker({
   const [saving, setSaving] = useState(false)
   const [showExercisePicker, setShowExercisePicker] = useState(false)
   const [pickerTab, setPickerTab] = useState<PickerTab>('browse')
-  const [mobileTab, setMobileTab] = useState<MobileTab>('exercises')
 
   const [newName, setNewName] = useState('')
   const [newMuscle, setNewMuscle] = useState('chest')
@@ -77,7 +78,6 @@ export default function WorkoutTracker({
     store.setCurrentExercise(store.activeExercises.length)
     setShowExercisePicker(false)
     setSearch('')
-    setMobileTab('logger')
   }
 
   const handleCreateExercise = async () => {
@@ -130,9 +130,9 @@ export default function WorkoutTracker({
   const progress = store.getProgress()
   const currentEx = store.activeExercises[store.currentExerciseIdx]
 
-  // ── JSX compartido: Exercise Picker ──
+  // ── Exercise Picker JSX ──
   const exercisePickerJSX = showExercisePicker && (
-    <div className="border border-iron" style={{ background: '#0e0d10' }}>
+    <div className="border border-iron mt-2" style={{ background: '#0e0d10' }}>
       <div className="flex border-b border-iron">
         {(['browse', 'create'] as PickerTab[]).map(tab => (
           <button key={tab} onClick={() => setPickerTab(tab)}
@@ -227,8 +227,8 @@ export default function WorkoutTracker({
     </div>
   )
 
-  // ── JSX compartido: Exercise List ──
-  const exerciseListJSX = (
+  // ── Desktop Exercise List ──
+  const desktopExerciseListJSX = (
     <>
       <div className="h-0.5 bg-iron mb-1 overflow-hidden">
         <div className="h-full transition-all duration-500"
@@ -254,7 +254,7 @@ export default function WorkoutTracker({
                   borderLeft: `2px solid ${active ? '#c0392b' : allDone ? '#6e6880' : 'transparent'}`,
                   opacity: allDone && !active ? 0.6 : 1,
                 }}
-                onClick={() => { store.setCurrentExercise(i); setMobileTab('logger') }}>
+                onClick={() => store.setCurrentExercise(i)}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-title text-sm text-bone font-semibold truncate">{ex.exercise.name}</p>
@@ -303,10 +303,12 @@ export default function WorkoutTracker({
     </>
   )
 
-  // ── JSX compartido: Set Logger ──
+  // ── Set Logger JSX ──
   const setLoggerJSX = currentEx ? (
     <div className="p-4 md:p-6"
       style={{ background: '#0e0d10', border: '1px solid #1a181e', borderTopColor: '#c0392b', borderTopWidth: '3px' }}>
+
+      {/* Nombre + badge custom */}
       <div className="flex items-center gap-3 mb-1">
         <h2 className="font-display text-lg md:text-xl text-bone">{currentEx.exercise.name}</h2>
         {currentEx.exercise.is_custom && (
@@ -316,12 +318,28 @@ export default function WorkoutTracker({
           </span>
         )}
       </div>
-      <p className="text-ghost text-xs tracking-widest uppercase mb-4">
+      <p className="text-ghost text-xs tracking-widest uppercase mb-2">
         {currentEx.exercise.muscle_group} · {currentEx.sets.length} sets
       </p>
 
+      {/* PR reference */}
+      {prs[currentEx.exercise.id] && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2"
+          style={{ background: 'rgba(232,196,106,0.05)', border: '1px solid rgba(232,196,106,0.2)' }}>
+          <span className="font-title text-[9px] tracking-widest uppercase"
+            style={{ color: '#e8c46a' }}>★ PR</span>
+          <span className="font-title text-[10px] text-ghost tracking-wide">
+            {prs[currentEx.exercise.id].best_weight}kg × {prs[currentEx.exercise.id].best_reps} reps
+            <span className="ml-1" style={{ color: '#6e6880' }}>
+              ({prs[currentEx.exercise.id].best_volume} vol)
+            </span>
+          </span>
+        </div>
+      )}
+
       <RestTimer />
 
+      {/* Sets */}
       <div className="flex flex-col gap-2 mb-4">
         <div className="grid grid-cols-5 gap-2 pb-2" style={{ borderBottom: '1px solid #1a181e' }}>
           {['Set', 'kg', 'Reps', 'RPE', '✓'].map(h => (
@@ -331,19 +349,29 @@ export default function WorkoutTracker({
 
         {currentEx.sets.map((s, setIdx) => {
           const last = lastSets[currentEx.exercise.id]?.[setIdx]
+          const pr = prs[currentEx.exercise.id]
           const weightPlaceholder = last?.weight_kg != null ? String(last.weight_kg) : '—'
           const repsPlaceholder = last?.reps != null ? String(last.reps) : '—'
+
+          const currentWeight = parseFloat(s.weightKg) || 0
+          const currentReps = parseInt(s.reps) || 0
+          const currentVol = currentWeight * currentReps
+          const isPR = s.completed && currentVol > 0 && pr && currentVol > pr.best_volume
 
           return (
             <div key={setIdx}
               className="grid grid-cols-5 gap-2 items-center py-1"
-              style={{ opacity: s.completed ? 0.6 : 1 }}>
+              style={{
+                opacity: s.completed && !isPR ? 0.6 : 1,
+                background: isPR ? 'rgba(232, 196, 106, 0.04)' : 'transparent',
+              }}>
               <p className="font-title text-xs text-ghost tracking-wide text-center">{setIdx + 1}</p>
               <input
                 className="input-dark w-full px-1 py-2.5 text-center text-sm font-semibold"
                 type="number" inputMode="decimal"
                 placeholder={weightPlaceholder}
                 value={s.weightKg}
+                style={{ borderColor: isPR ? '#e8c46a' : undefined }}
                 onChange={e => store.updateSet(store.currentExerciseIdx, setIdx, 'weightKg', e.target.value)}
               />
               <input
@@ -351,6 +379,7 @@ export default function WorkoutTracker({
                 type="number" inputMode="numeric"
                 placeholder={repsPlaceholder}
                 value={s.reps}
+                style={{ borderColor: isPR ? '#e8c46a' : undefined }}
                 onChange={e => store.updateSet(store.currentExerciseIdx, setIdx, 'reps', e.target.value)}
               />
               <input
@@ -366,12 +395,12 @@ export default function WorkoutTracker({
                 }}
                 className="w-full h-10 flex items-center justify-center transition-all duration-200 text-base"
                 style={{
-                  background: s.completed ? '#7a0000' : '#1a181e',
-                  border: `1px solid ${s.completed ? '#c0392b' : '#6e6880'}`,
-                  color: s.completed ? '#e74c3c' : '#6e6880',
-                  boxShadow: s.completed ? '0 0 10px rgba(192,57,43,0.3)' : 'none',
+                  background: isPR ? '#3a2e00' : s.completed ? '#7a0000' : '#1a181e',
+                  border: `1px solid ${isPR ? '#e8c46a' : s.completed ? '#c0392b' : '#6e6880'}`,
+                  color: isPR ? '#e8c46a' : s.completed ? '#e74c3c' : '#6e6880',
+                  boxShadow: isPR ? '0 0 10px rgba(232,196,106,0.25)' : s.completed ? '0 0 10px rgba(192,57,43,0.3)' : 'none',
                 }}>
-                {s.completed ? '✓' : '○'}
+                {isPR ? '★' : s.completed ? '✓' : '○'}
               </button>
             </div>
           )
@@ -398,7 +427,7 @@ export default function WorkoutTracker({
     <div className="flex flex-col items-center justify-center h-48 gap-4"
       style={{ border: '1px dashed #2e1a1a' }}>
       <p className="text-ghost font-title text-xs tracking-widest uppercase">Add an exercise to begin</p>
-      <button onClick={() => { setShowExercisePicker(true); setMobileTab('exercises') }}
+      <button onClick={() => setShowExercisePicker(true)}
         className="font-title text-xs tracking-widest uppercase px-6 py-2.5"
         style={{ background: '#7a0000', border: '1px solid #c0392b', color: '#f0e8d5' }}>
         + Add Exercise
@@ -419,10 +448,12 @@ export default function WorkoutTracker({
             Active <span className="text-crimson">Assault</span>
           </h1>
           {routineName && routineDay && (
-            <p className="text-ghost text-xs tracking-widest uppercase mt-1">{routineName} · Day {routineDay}</p>
+            <p className="text-ghost text-xs tracking-widest uppercase mt-1">
+              {routineName} · Day {routineDay}
+            </p>
           )}
         </div>
-        <button className="btn-primary w-36 md:w-48 text-xs" onClick={finishSession}
+        <button className="btn-primary w-32 md:w-48 text-xs" onClick={finishSession}
           disabled={saving} style={{ opacity: saving ? 0.6 : 1 }}>
           {saving ? 'Saving...' : 'Finish'}
         </button>
@@ -432,7 +463,7 @@ export default function WorkoutTracker({
       <div className="hidden md:grid grid-cols-5 gap-6">
         <div className="col-span-2">
           <div className="section-label mb-4">Exercises</div>
-          {exerciseListJSX}
+          {desktopExerciseListJSX}
         </div>
         <div className="col-span-3">
           {setLoggerJSX}
@@ -440,86 +471,92 @@ export default function WorkoutTracker({
       </div>
 
       {/* ── Mobile ── */}
-<div className="md:hidden">
+      <div className="md:hidden">
 
-{/* Scroll horizontal de ejercicios */}
-<div className="mb-4 -mx-4 px-4">
-  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none"
-    style={{ scrollSnapType: 'x mandatory' }}>
+        {/* Tira horizontal de ejercicios */}
+        <div className="-mx-4 px-4 mb-4">
+          <div className="flex gap-2 overflow-x-auto pb-2"
+            style={{ scrollSnapType: 'x mandatory', scrollbarWidth: 'none' }}>
 
-    {store.activeExercises.map((ex, i) => {
-      const active = i === store.currentExerciseIdx
-      const done = ex.sets.every(s => s.completed)
-      const doneSets = ex.sets.filter(s => s.completed).length
+            {store.activeExercises.length === 0 ? (
+              <div className="flex-shrink-0 px-4 py-3 text-center"
+                style={{ border: '1px dashed #2e1a1a', minWidth: '160px' }}>
+                <p className="font-title text-[10px] tracking-widest uppercase text-ghost">No exercises yet</p>
+              </div>
+            ) : (
+              store.activeExercises.map((ex, i) => {
+                const active = i === store.currentExerciseIdx
+                const done = ex.sets.every(s => s.completed)
+                const doneSets = ex.sets.filter(s => s.completed).length
 
-      return (
-        <button key={ex.exercise.id}
-          onClick={() => store.setCurrentExercise(i)}
-          className="flex-shrink-0 text-left transition-all duration-150 px-3 py-2.5"
-          style={{
-            scrollSnapAlign: 'start',
-            background: active ? '#1a181e' : '#0e0d10',
-            border: `1px solid ${active ? '#c0392b' : done ? '#4a4455' : '#1a181e'}`,
-            minWidth: '120px',
-            maxWidth: '140px',
-            opacity: done && !active ? 0.6 : 1,
-          }}>
-          <p className="font-title text-[10px] tracking-widest uppercase mb-1 truncate"
-            style={{ color: active ? '#c0392b' : '#6e6880' }}>
-            {ex.exercise.muscle_group}
-          </p>
-          <p className="font-title text-xs font-bold text-bone leading-snug truncate mb-1.5">
-            {ex.exercise.name}
-          </p>
-          {/* Dots de sets */}
-          <div className="flex gap-1 flex-wrap">
-            {ex.sets.map((s, j) => (
-              <div key={j} className="w-1.5 h-1.5 rounded-full"
-                style={{
-                  background: s.completed ? '#c0392b' : active ? '#4a4455' : '#2e2e3a',
-                  boxShadow: s.completed ? '0 0 4px rgba(192,57,43,0.5)' : 'none',
-                }} />
-            ))}
+                return (
+                  <button key={ex.exercise.id}
+                    onClick={() => store.setCurrentExercise(i)}
+                    className="flex-shrink-0 text-left transition-all duration-150 px-3 py-2.5"
+                    style={{
+                      scrollSnapAlign: 'start',
+                      background: active ? '#1a181e' : '#0e0d10',
+                      border: `1px solid ${active ? '#c0392b' : done ? '#4a4455' : '#1a181e'}`,
+                      minWidth: '120px',
+                      maxWidth: '140px',
+                      opacity: done && !active ? 0.6 : 1,
+                    }}>
+                    <p className="font-title text-[10px] tracking-widest uppercase mb-1 truncate"
+                      style={{ color: active ? '#c0392b' : '#6e6880' }}>
+                      {ex.exercise.muscle_group}
+                    </p>
+                    <p className="font-title text-xs font-bold text-bone leading-snug truncate mb-1.5">
+                      {ex.exercise.name}
+                    </p>
+                    <div className="flex gap-1 flex-wrap mb-1">
+                      {ex.sets.map((s, j) => (
+                        <div key={j} className="w-1.5 h-1.5 rounded-full"
+                          style={{
+                            background: s.completed ? '#c0392b' : active ? '#4a4455' : '#2e2e3a',
+                            boxShadow: s.completed ? '0 0 4px rgba(192,57,43,0.5)' : 'none',
+                          }} />
+                      ))}
+                    </div>
+                    <p className="font-title text-[9px] tracking-widest text-ghost">
+                      {doneSets}/{ex.sets.length}
+                    </p>
+                  </button>
+                )
+              })
+            )}
+
+            {/* Botón + inline */}
+            <button
+              onClick={() => setShowExercisePicker(v => !v)}
+              className="flex-shrink-0 flex items-center justify-center transition-all duration-150"
+              style={{
+                minWidth: '48px',
+                minHeight: '80px',
+                background: showExercisePicker ? '#2e1a1a' : '#0e0d10',
+                border: `1px solid ${showExercisePicker ? '#c0392b' : '#1a181e'}`,
+                color: showExercisePicker ? '#e74c3c' : '#4a4455',
+                fontSize: '20px',
+              }}>
+              {showExercisePicker ? '✕' : '+'}
+            </button>
           </div>
-          <p className="font-title text-[9px] tracking-widest text-ghost mt-1">
-            {doneSets}/{ex.sets.length}
-          </p>
-        </button>
-      )
-    })}
 
-    {/* Botón agregar ejercicio inline */}
-    <button
-      onClick={() => setShowExercisePicker(v => !v)}
-      className="flex-shrink-0 flex items-center justify-center transition-all duration-150"
-      style={{
-        minWidth: '48px',
-        background: showExercisePicker ? '#2e1a1a' : '#0e0d10',
-        border: `1px solid ${showExercisePicker ? '#c0392b' : '#1a181e'}`,
-        color: showExercisePicker ? '#e74c3c' : '#4a4455',
-        fontSize: '20px',
-      }}>
-      {showExercisePicker ? '✕' : '+'}
-    </button>
-  </div>
+          {exercisePickerJSX}
+        </div>
 
-  {/* Exercise picker */}
-  {showExercisePicker && exercisePickerJSX}
-</div>
+        {/* Progress bar */}
+        <div className="h-0.5 bg-iron mb-4 overflow-hidden -mx-4">
+          <div className="h-full transition-all duration-500"
+            style={{
+              width: `${progress}%`,
+              background: 'linear-gradient(90deg, #7a0000, #e74c3c)',
+              boxShadow: '0 0 8px #c0392b',
+            }} />
+        </div>
 
-{/* Progress bar */}
-<div className="h-0.5 bg-iron mb-3 overflow-hidden -mx-4">
-  <div className="h-full transition-all duration-500"
-    style={{
-      width: `${progress}%`,
-      background: 'linear-gradient(90deg, #7a0000, #e74c3c)',
-      boxShadow: '0 0 8px #c0392b',
-    }} />
-</div>
-
-{/* Set logger — siempre visible */}
-{setLoggerJSX}
-</div>
+        {/* Logger siempre visible */}
+        {setLoggerJSX}
+      </div>
     </div>
   )
 }

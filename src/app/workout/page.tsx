@@ -4,7 +4,7 @@ import { getProfile, getExercises } from '@/lib/queries/profile'
 import Sidebar from '@/components/layout/Sidebar'
 import WorkoutTracker from '@/components/workout/WorkoutTracker'
 import { getMyRoutinesWithExercises } from '@/lib/queries/routines'
-import { getLastSetsForExercises } from '@/lib/queries/sessions'
+import { getLastSetsForExercises, getPRsForExercises } from '@/lib/queries/sessions'
 
 interface Props {
   searchParams: { routineId?: string; day?: string }
@@ -37,7 +37,10 @@ export default async function WorkoutPage({ searchParams }: Props) {
     .sort((a, b) => a.position - b.position)
 
   const exerciseIds = routineExercisesForDay.map(re => re.exercise_id)
-  const lastSets = await getLastSetsForExercises(user.id, exerciseIds)
+  const [lastSets, prs] = await Promise.all([
+    getLastSetsForExercises(user.id, exerciseIds),
+    getPRsForExercises(user.id, exerciseIds),
+  ])
 
   return (
     <div className="flex min-h-screen bg-void">
@@ -51,6 +54,7 @@ export default async function WorkoutPage({ searchParams }: Props) {
           routineDay={day}
           preloadedExercises={routineExercisesForDay}
           lastSets={lastSets}
+          prs={prs}
         />
       </main>
     </div>

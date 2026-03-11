@@ -22,44 +22,6 @@ export async function getRecentSessions(limit = 10) {
   return (data as SessionWithSets[] | null) ?? []
 }
 
-export async function getDashboardStats() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { count: totalSessions } = await (supabase as any)
-    .from('workout_sessions')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .not('finished_at', 'is', null)
-
-  const startOfMonth = new Date()
-  startOfMonth.setDate(1)
-  startOfMonth.setHours(0, 0, 0, 0)
-
-  const { data: monthSessions } = await (supabase as any)
-    .from('workout_sessions')
-    .select('total_volume')
-    .eq('user_id', user.id)
-    .gte('started_at', startOfMonth.toISOString())
-
-  const monthVolume = (monthSessions as { total_volume: number }[] | null)
-    ?.reduce((sum, s) => sum + (s.total_volume ?? 0), 0) ?? 0
-
-  const { data: profileData } = await (supabase as any)
-    .from('profiles')
-    .select('streak')
-    .eq('id', user.id)
-    .single()
-
-  const profile = profileData as { streak: number } | null
-
-  return {
-    totalSessions: totalSessions ?? 0,
-    monthVolumeKg: monthVolume,
-    streak: profile?.streak ?? 0,
-  }
-}
 
 export async function startWorkoutSession(routineId?: number) {
   const supabase = await createClient()
@@ -225,4 +187,141 @@ export async function getSessionsByMonth(userId: string, year: number, month: nu
       })),
     }
   })
+}
+
+export interface ExercisePR {
+  exercise_id: number
+  best_weight: number
+  best_reps: number
+  best_volume: number // weight × reps — el verdadero PR
+}
+
+export async function getPRsForExercises(
+  userId: string,
+  exerciseIds: number[]
+): Promise<Record<number, ExercisePR>> {
+  if (exerciseIds.length === 0) return {}
+  const supabase = await createClient()
+
+  const { data } = await (supabase as any)
+    .from('workout_sets')
+    .select(`
+      exercise_id,
+      weight_kg,
+      reps,
+      workout_sessions!inner ( user_id )
+    `)
+    .eq('workout_sessions.user_id', userId)
+    .in('exercise_id', exerciseIds)
+    .eq('completed', true)
+    .not('weight_kg', 'is', null)
+    .not('reps', 'is', null)
+
+  if (!data) return {}
+
+  const map: Record<number, ExercisePR> = {}
+  for (const row of data as any[]) {
+    const id = row.exercise_id
+    const vol = (row.weight_kg ?? 0) * (row.reps ?? 0)
+    if (!map[id] || vol > map[id].best_volume) {
+      map[id] = {
+        exercise_id: id,
+        best_weight: row.weight_kg,
+        best_reps: row.reps,
+        best_volume: vol,
+      }
+    }
+  }
+
+  return map
+}
+
+export interface WeeklyVolume {
+  week: string
+  volume: number
+  sessions: number
+}
+
+export interface MuscleFrequency {
+  muscle_group: string
+  sets: number
+}
+
+export async function getDashboardStats(userId: string) {
+  const supabase = await createClient()
+
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+  const { data: sessions } = await (supabase as any)
+    .from('workout_sessions')
+    .select(`
+      id,
+      started_at,
+      finished_at,
+      total_volume,
+      workout_sets (
+        completed,
+        weight_kg,
+        reps,
+        exercises ( muscle_group )
+      )
+    `)
+    .eq('user_id', userId)
+    .not('finished_at', 'is', null)
+    .gte('started_at', thirtyDaysAgo.toISOString())
+    .order('started_at', { ascending: true })
+
+  if (!sessions) return { weeklyVolume: [], muscleFrequency: [], totalSessions: 0, totalVolume: 0, avgDuration: 0 }
+
+  // Volumen por semana
+  const weekMap: Record<string, { volume: number; sessions: number }> = {}
+  for (const s of sessions as any[]) {
+    const d = new Date(s.started_at)
+    // Lunes de esa semana
+    const day = d.getDay()
+    const monday = new Date(d)
+    monday.setDate(d.getDate() - ((day + 6) % 7))
+    const key = monday.toISOString().slice(0, 10)
+    if (!weekMap[key]) weekMap[key] = { volume: 0, sessions: 0 }
+    weekMap[key].volume += s.total_volume ?? 0
+    weekMap[key].sessions += 1
+  }
+
+  const weeklyVolume: WeeklyVolume[] = Object.entries(weekMap).map(([week, data]) => ({
+    week,
+    volume: Math.round(data.volume),
+    sessions: data.sessions,
+  }))
+
+  // Frecuencia por músculo
+  const muscleMap: Record<string, number> = {}
+  for (const s of sessions as any[]) {
+    for (const ws of s.workout_sets ?? []) {
+      if (!ws.completed) continue
+      const mg = ws.exercises?.muscle_group
+      if (mg) muscleMap[mg] = (muscleMap[mg] ?? 0) + 1
+    }
+  }
+
+  const muscleFrequency: MuscleFrequency[] = Object.entries(muscleMap)
+    .map(([muscle_group, sets]) => ({ muscle_group, sets }))
+    .sort((a, b) => b.sets - a.sets)
+
+  // Stats globales
+  const totalVolume = (sessions as any[]).reduce((s, se) => s + (se.total_volume ?? 0), 0)
+  const durations = (sessions as any[])
+    .filter(s => s.finished_at)
+    .map(s => new Date(s.finished_at).getTime() - new Date(s.started_at).getTime())
+  const avgDuration = durations.length > 0
+    ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length / 60000)
+    : 0
+
+  return {
+    weeklyVolume,
+    muscleFrequency,
+    totalSessions: (sessions as any[]).length,
+    totalVolume: Math.round(totalVolume),
+    avgDuration,
+  }
 }

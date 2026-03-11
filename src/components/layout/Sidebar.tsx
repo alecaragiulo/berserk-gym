@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: '/routines',  icon: '◈', label: 'Routines'  },
   { href: '/history',   icon: '◷', label: 'History'   },
   { href: '/progress',  icon: '▲', label: 'Progress'  },
+  { href: '/settings',  icon: '◎', label: 'Settings'  },
 ]
 
 interface Props {
