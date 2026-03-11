@@ -22,12 +22,14 @@ export async function getProfile(userId: string): Promise<ProfileData | null> {
 
 export async function getExercises(): Promise<Exercise[]> {
   const supabase = await createClient()
-  const { data } = await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const { data } = await (supabase as any)
     .from('exercises')
     .select('*')
-    .eq('is_custom', false)
-    .order('muscle_group')
-    .order('name')
+    .or(`is_custom.eq.false,created_by.eq.${user?.id}`)  // predefinidos + custom del usuario
+    .order('name', { ascending: true })
+
   return (data as Exercise[] | null) ?? []
 }
 
