@@ -104,3 +104,36 @@ export async function finishWorkoutSession(sessionId: number) {
   if (error) throw error
   return data
 }
+
+export async function getLastSetsForExercises(
+  userId: string,
+  exerciseIds: number[]
+): Promise<Record<number, { weight_kg: number | null; reps: number | null }[]>> {
+  if (exerciseIds.length === 0) return {}
+  const supabase = await createClient()
+
+  // Para cada ejercicio traemos los sets de la última sesión donde apareció
+  const result: Record<number, { weight_kg: number | null; reps: number | null }[]> = {}
+
+  await Promise.all(exerciseIds.map(async (exerciseId) => {
+    const { data } = await (supabase as any)
+      .from('workout_sets')
+      .select('weight_kg, reps, set_number, workout_sessions!inner(user_id, started_at)')
+      .eq('exercise_id', exerciseId)
+      .eq('workout_sessions.user_id', userId)
+      .eq('completed', true)
+      .order('workout_sessions(started_at)', { ascending: false })
+      .limit(10)
+
+    if (!data || data.length === 0) return
+
+    // Agrupar por sesión — tomamos solo la más reciente
+    const sets = (data as any[])
+      .sort((a, b) => a.set_number - b.set_number)
+      .map(s => ({ weight_kg: s.weight_kg, reps: s.reps }))
+
+    result[exerciseId] = sets
+  }))
+
+  return result
+}

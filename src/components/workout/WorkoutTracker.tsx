@@ -12,13 +12,16 @@ interface Props {
   routineName: string | null
   routineDay: number | null
   preloadedExercises: any[]
+  lastSets: Record<number, { weight_kg: number | null; reps: number | null }[]>
 }
 
 const MUSCLE_GROUPS = ['all', 'chest', 'back', 'shoulders', 'legs', 'biceps', 'triceps']
 type PickerTab = 'browse' | 'create'
 type MobileTab = 'exercises' | 'logger'
 
-export default function WorkoutTracker({ exercises, userId, routineId, routineName, routineDay, preloadedExercises }: Props) {
+export default function WorkoutTracker({
+  exercises, userId, routineId, routineName, routineDay, preloadedExercises, lastSets
+}: Props) {
   const store = useWorkoutStore()
   const sessionStarted = useRef(false)
 
@@ -73,7 +76,7 @@ export default function WorkoutTracker({ exercises, userId, routineId, routineNa
     store.setCurrentExercise(store.activeExercises.length)
     setShowExercisePicker(false)
     setSearch('')
-    setMobileTab('logger') // en mobile, saltar directo al logger
+    setMobileTab('logger')
   }
 
   const removeExercise = (idx: number) => store.removeExercise(idx)
@@ -128,7 +131,104 @@ export default function WorkoutTracker({ exercises, userId, routineId, routineNa
   const progress = store.getProgress()
   const currentEx = store.activeExercises[store.currentExerciseIdx]
 
-  // ── Exercise list (compartido entre desktop y mobile) ──
+  // ── Exercise Picker ──
+  const ExercisePicker = () => (
+    <div className="border border-iron" style={{ background: '#0e0d10' }}>
+      <div className="flex border-b border-iron">
+        {(['browse', 'create'] as PickerTab[]).map(tab => (
+          <button key={tab} onClick={() => setPickerTab(tab)}
+            className="flex-1 py-2.5 font-title text-[10px] tracking-widest uppercase transition-all duration-150"
+            style={{
+              background: pickerTab === tab ? '#1a181e' : 'transparent',
+              color: pickerTab === tab ? '#f0e8d5' : '#6e6880',
+              borderBottom: pickerTab === tab ? '2px solid #c0392b' : '2px solid transparent',
+            }}>
+            {tab === 'browse' ? 'Browse' : '+ Create New'}
+          </button>
+        ))}
+      </div>
+
+      {pickerTab === 'browse' ? (
+        <>
+          <div className="flex flex-wrap gap-0.5 p-2 border-b border-iron">
+            {MUSCLE_GROUPS.map(mg => (
+              <button key={mg} onClick={() => setFilter(mg)}
+                className="font-title text-[9px] tracking-widest uppercase px-2 py-1 transition-all duration-150"
+                style={{ background: filter === mg ? '#7a0000' : 'transparent', color: filter === mg ? '#f0e8d5' : '#6e6880' }}>
+                {mg}
+              </button>
+            ))}
+          </div>
+          <div className="p-2 border-b border-iron">
+            <input className="input-dark w-full px-3 py-2 text-sm"
+              placeholder="Search..." value={search}
+              onChange={e => setSearch(e.target.value)} />
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            {filteredExercises.length === 0
+              ? <p className="text-ghost text-xs p-3 tracking-wide">No exercises found</p>
+              : filteredExercises.map(ex => (
+                <button key={ex.id} onClick={() => addExercise(ex)}
+                  className="w-full text-left px-3 py-3 transition-all duration-150 border-b border-iron/50"
+                  style={{ background: 'transparent' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#1a181e')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  <div className="flex items-center gap-2">
+                    <p className="font-title text-sm text-bone font-semibold">{ex.name}</p>
+                    {ex.is_custom && (
+                      <span className="text-[9px] font-title tracking-widest uppercase px-1 py-0.5"
+                        style={{ background: '#2e1a1a', border: '1px solid #7a0000', color: '#e74c3c' }}>
+                        custom
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-ghost text-[10px] tracking-wide uppercase">
+                    {ex.muscle_group}{ex.equipment ? ` · ${ex.equipment}` : ''}
+                  </p>
+                </button>
+              ))
+            }
+          </div>
+        </>
+      ) : (
+        <div className="p-4 flex flex-col gap-3">
+          <div>
+            <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">Exercise Name *</label>
+            <input className="input-dark w-full px-3 py-2.5 text-sm"
+              placeholder="e.g. Hack Squat" value={newName}
+              onChange={e => setNewName(e.target.value)} />
+          </div>
+          <div>
+            <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">Muscle Group *</label>
+            <select className="input-dark w-full px-3 py-2.5 text-sm" value={newMuscle}
+              onChange={e => setNewMuscle(e.target.value)} style={{ background: '#1a181e' }}>
+              {MUSCLE_GROUPS.filter(m => m !== 'all').map(m => (
+                <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">
+              Equipment <span className="text-ghost/50">(optional)</span>
+            </label>
+            <input className="input-dark w-full px-3 py-2.5 text-sm"
+              placeholder="barbell, dumbbell..." value={newEquipment}
+              onChange={e => setNewEquipment(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCreateExercise()} />
+          </div>
+          {createError && (
+            <p className="text-ember text-xs border border-blood/50 bg-rust/30 px-3 py-2">{createError}</p>
+          )}
+          <button className="btn-primary" onClick={handleCreateExercise}
+            disabled={creating} style={{ opacity: creating ? 0.6 : 1 }}>
+            {creating ? 'Creating...' : 'Create & Add'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+
+  // ── Exercise List ──
   const ExerciseList = () => (
     <>
       <div className="h-0.5 bg-iron mb-1 overflow-hidden">
@@ -155,10 +255,7 @@ export default function WorkoutTracker({ exercises, userId, routineId, routineNa
                   borderLeft: `2px solid ${active ? '#c0392b' : allDone ? '#6e6880' : 'transparent'}`,
                   opacity: allDone && !active ? 0.6 : 1,
                 }}
-                onClick={() => {
-                  store.setCurrentExercise(i)
-                  setMobileTab('logger')
-                }}>
+                onClick={() => { store.setCurrentExercise(i); setMobileTab('logger') }}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-title text-sm text-bone font-semibold truncate">{ex.exercise.name}</p>
@@ -193,7 +290,6 @@ export default function WorkoutTracker({ exercises, userId, routineId, routineNa
         </div>
       )}
 
-      {/* Toggle picker */}
       <button onClick={() => setShowExercisePicker(v => !v)}
         className="w-full py-2.5 font-title text-xs tracking-widest uppercase transition-all duration-150 mb-3"
         style={{
@@ -204,98 +300,11 @@ export default function WorkoutTracker({ exercises, userId, routineId, routineNa
         {showExercisePicker ? '✕ Close' : '+ Add Exercise'}
       </button>
 
-      {/* Picker */}
-      {showExercisePicker && (
-        <div className="border border-iron" style={{ background: '#0e0d10' }}>
-          <div className="flex border-b border-iron">
-            {(['browse', 'create'] as PickerTab[]).map(tab => (
-              <button key={tab} onClick={() => setPickerTab(tab)}
-                className="flex-1 py-2.5 font-title text-[10px] tracking-widest uppercase transition-all duration-150"
-                style={{
-                  background: pickerTab === tab ? '#1a181e' : 'transparent',
-                  color: pickerTab === tab ? '#f0e8d5' : '#6e6880',
-                  borderBottom: pickerTab === tab ? '2px solid #c0392b' : '2px solid transparent',
-                }}>
-                {tab === 'browse' ? 'Browse' : '+ Create New'}
-              </button>
-            ))}
-          </div>
-
-          {pickerTab === 'browse' ? (
-            <>
-              <div className="flex flex-wrap gap-0.5 p-2 border-b border-iron">
-                {MUSCLE_GROUPS.map(mg => (
-                  <button key={mg} onClick={() => setFilter(mg)}
-                    className="font-title text-[9px] tracking-widest uppercase px-2 py-1 transition-all duration-150"
-                    style={{ background: filter === mg ? '#7a0000' : 'transparent', color: filter === mg ? '#f0e8d5' : '#6e6880' }}>
-                    {mg}
-                  </button>
-                ))}
-              </div>
-              <div className="p-2 border-b border-iron">
-                <input className="input-dark w-full px-3 py-2 text-sm"
-                  placeholder="Search..." value={search}
-                  onChange={e => setSearch(e.target.value)} />
-              </div>
-              <div className="max-h-52 overflow-y-auto">
-                {filteredExercises.length === 0
-                  ? <p className="text-ghost text-xs p-3 tracking-wide">No exercises found</p>
-                  : filteredExercises.map(ex => (
-                    <button key={ex.id} onClick={() => addExercise(ex)}
-                      className="w-full text-left px-3 py-3 transition-all duration-150 border-b border-iron/50"
-                      style={{ background: 'transparent' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#1a181e')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <p className="font-title text-sm text-bone font-semibold">{ex.name}</p>
-                      <p className="text-ghost text-[10px] tracking-wide uppercase">
-                        {ex.muscle_group}{ex.equipment ? ` · ${ex.equipment}` : ''}
-                      </p>
-                    </button>
-                  ))
-                }
-              </div>
-            </>
-          ) : (
-            <div className="p-4 flex flex-col gap-3">
-              <div>
-                <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">Exercise Name *</label>
-                <input className="input-dark w-full px-3 py-2.5 text-sm"
-                  placeholder="e.g. Hack Squat" value={newName}
-                  onChange={e => setNewName(e.target.value)} />
-              </div>
-              <div>
-                <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">Muscle Group *</label>
-                <select className="input-dark w-full px-3 py-2.5 text-sm" value={newMuscle}
-                  onChange={e => setNewMuscle(e.target.value)} style={{ background: '#1a181e' }}>
-                  {MUSCLE_GROUPS.filter(m => m !== 'all').map(m => (
-                    <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="font-title text-[10px] tracking-widest uppercase text-ghost block mb-1.5">
-                  Equipment <span className="text-ghost/50">(optional)</span>
-                </label>
-                <input className="input-dark w-full px-3 py-2.5 text-sm"
-                  placeholder="barbell, dumbbell..." value={newEquipment}
-                  onChange={e => setNewEquipment(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleCreateExercise()} />
-              </div>
-              {createError && (
-                <p className="text-ember text-xs border border-blood/50 bg-rust/30 px-3 py-2">{createError}</p>
-              )}
-              <button className="btn-primary" onClick={handleCreateExercise}
-                disabled={creating} style={{ opacity: creating ? 0.6 : 1 }}>
-                {creating ? 'Creating...' : 'Create & Add'}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      {showExercisePicker && <ExercisePicker />}
     </>
   )
 
-  // ── Set Logger (compartido entre desktop y mobile) ──
+  // ── Set Logger ──
   const SetLogger = () => (
     <>
       {currentEx ? (
@@ -314,50 +323,56 @@ export default function WorkoutTracker({ exercises, userId, routineId, routineNa
             {currentEx.exercise.muscle_group} · {currentEx.sets.length} sets
           </p>
 
-          {/* Tabla de sets — touch-friendly */}
           <div className="flex flex-col gap-2 mb-4">
-            {/* Header */}
             <div className="grid grid-cols-5 gap-2 pb-2" style={{ borderBottom: '1px solid #1a181e' }}>
               {['Set', 'kg', 'Reps', 'RPE', '✓'].map(h => (
                 <p key={h} className="font-title text-[10px] tracking-widest text-ghost uppercase text-center">{h}</p>
               ))}
             </div>
-            {currentEx.sets.map((s, setIdx) => (
-              <div key={setIdx}
-                className="grid grid-cols-5 gap-2 items-center py-1"
-                style={{ opacity: s.completed ? 0.6 : 1 }}>
-                <p className="font-title text-xs text-ghost tracking-wide text-center">{setIdx + 1}</p>
-                <input
-                  className="input-dark w-full px-1 py-2.5 text-center text-sm font-semibold"
-                  type="number" inputMode="decimal" placeholder="—"
-                  value={s.weightKg}
-                  onChange={e => store.updateSet(store.currentExerciseIdx, setIdx, 'weightKg', e.target.value)}
-                />
-                <input
-                  className="input-dark w-full px-1 py-2.5 text-center text-sm font-semibold"
-                  type="number" inputMode="numeric" placeholder="—"
-                  value={s.reps}
-                  onChange={e => store.updateSet(store.currentExerciseIdx, setIdx, 'reps', e.target.value)}
-                />
-                <input
-                  className="input-dark w-full px-1 py-2.5 text-center text-sm"
-                  type="number" inputMode="numeric" placeholder="—"
-                  min="1" max="10"
-                />
-                {/* Check button — grande para el dedo */}
-                <button
-                  onClick={() => store.toggleSetComplete(store.currentExerciseIdx, setIdx)}
-                  className="w-full h-10 flex items-center justify-center transition-all duration-200 text-base mx-auto"
-                  style={{
-                    background: s.completed ? '#7a0000' : '#1a181e',
-                    border: `1px solid ${s.completed ? '#c0392b' : '#6e6880'}`,
-                    color: s.completed ? '#e74c3c' : '#6e6880',
-                    boxShadow: s.completed ? '0 0 10px rgba(192,57,43,0.3)' : 'none',
-                  }}>
-                  {s.completed ? '✓' : '○'}
-                </button>
-              </div>
-            ))}
+
+            {currentEx.sets.map((s, setIdx) => {
+              const last = lastSets[currentEx.exercise.id]?.[setIdx]
+              const weightPlaceholder = last?.weight_kg != null ? String(last.weight_kg) : '—'
+              const repsPlaceholder = last?.reps != null ? String(last.reps) : '—'
+
+              return (
+                <div key={setIdx}
+                  className="grid grid-cols-5 gap-2 items-center py-1"
+                  style={{ opacity: s.completed ? 0.6 : 1 }}>
+                  <p className="font-title text-xs text-ghost tracking-wide text-center">{setIdx + 1}</p>
+                  <input
+                    className="input-dark w-full px-1 py-2.5 text-center text-sm font-semibold"
+                    type="number" inputMode="decimal"
+                    placeholder={weightPlaceholder}
+                    value={s.weightKg}
+                    onChange={e => store.updateSet(store.currentExerciseIdx, setIdx, 'weightKg', e.target.value)}
+                  />
+                  <input
+                    className="input-dark w-full px-1 py-2.5 text-center text-sm font-semibold"
+                    type="number" inputMode="numeric"
+                    placeholder={repsPlaceholder}
+                    value={s.reps}
+                    onChange={e => store.updateSet(store.currentExerciseIdx, setIdx, 'reps', e.target.value)}
+                  />
+                  <input
+                    className="input-dark w-full px-1 py-2.5 text-center text-sm"
+                    type="number" inputMode="numeric"
+                    placeholder="—" min="1" max="10"
+                  />
+                  <button
+                    onClick={() => store.toggleSetComplete(store.currentExerciseIdx, setIdx)}
+                    className="w-full h-10 flex items-center justify-center transition-all duration-200 text-base"
+                    style={{
+                      background: s.completed ? '#7a0000' : '#1a181e',
+                      border: `1px solid ${s.completed ? '#c0392b' : '#6e6880'}`,
+                      color: s.completed ? '#e74c3c' : '#6e6880',
+                      boxShadow: s.completed ? '0 0 10px rgba(192,57,43,0.3)' : 'none',
+                    }}>
+                    {s.completed ? '✓' : '○'}
+                  </button>
+                </div>
+              )
+            })}
           </div>
 
           <div className="flex gap-2">
@@ -415,7 +430,7 @@ export default function WorkoutTracker({ exercises, userId, routineId, routineNa
         </button>
       </header>
 
-      {/* ── Desktop: grid de 5 cols ── */}
+      {/* ── Desktop: grid ── */}
       <div className="hidden md:grid grid-cols-5 gap-6">
         <div className="col-span-2">
           <div className="section-label mb-4">Exercises</div>
@@ -428,7 +443,6 @@ export default function WorkoutTracker({ exercises, userId, routineId, routineNa
 
       {/* ── Mobile: tabs ── */}
       <div className="md:hidden">
-        {/* Tab switcher */}
         <div className="flex mb-4" style={{ borderBottom: '1px solid #1a181e' }}>
           {([['exercises', 'Exercises'], ['logger', 'Logger']] as [MobileTab, string][]).map(([t, label]) => (
             <button key={t} onClick={() => setMobileTab(t)}

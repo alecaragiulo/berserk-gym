@@ -125,9 +125,12 @@ export default function RoutinesFeed({ publicRoutines, myRoutines, subscribedIds
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 transition-transform duration-300 origin-left scale-x-0 group-hover:scale-x-100"
                     style={{ background: '#7a0000' }} />
                   <div className="p-5">
-                    <p className="text-ghost text-[10px] tracking-[0.2em] uppercase mb-2">
-                      {(routine.profiles as { username: string })?.username ?? 'unknown'}
-                    </p>
+                  <Link
+                    href={`/profile/${(routine.profiles as { username: string })?.username}`}
+                    className="text-ghost text-[10px] tracking-[0.2em] uppercase mb-2 hover:text-ash transition-colors"
+                    onClick={e => e.stopPropagation()}>
+                    {(routine.profiles as { username: string })?.username ?? 'unknown'}
+                  </Link>
                     <p className="font-title text-base font-bold text-bone mb-3 leading-snug">{routine.name}</p>
                     <div className="flex flex-wrap gap-1 mb-4">
                       {routine.tags?.map((tag: string, i: number) => (
